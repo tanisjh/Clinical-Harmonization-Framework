@@ -1,0 +1,31 @@
+schema_id: synthetic/device_stage8
+schema_version: 1.0.0
+title: Synthetic source-attributed declared-absence replay
+row_key: [device_id, reading_id]
+column_order:
+  - device_id
+  - reading_id
+  - location
+  - attributed_not_applicable
+  - attributed_source_missing
+  - attributed_literal_key
+  - attributed_raw_none
+  - attributed_default_column
+  - attributed_no_value_rule
+  - attributed_group_key
+  - unsupported_no_mapping
+  - anchor_absence
+fields:
+  - {name: device_id, type: string, nullable: false}
+  - {name: reading_id, type: string, nullable: false}
+  - {name: location, type: string, nullable: false}
+  - {name: attributed_not_applicable, type: string, nullable: true}
+  - {name: attributed_source_missing, type: string, nullable: true}
+  - {name: attributed_literal_key, type: string, nullable: true}
+  - {name: attributed_raw_none, type: string, nullable: true}
+  - {name: attributed_default_column, type: string, nullable: true}
+  - {name: attributed_no_value_rule, type: string, nullable: true}
+  - {name: attributed_group_key, type: string, nullable: true}
+  - {name: unsupported_no_mapping, type: string, nullable: true}
+  - {name: anchor_absence, type: string, nullable: true}
+null_encoding: ""

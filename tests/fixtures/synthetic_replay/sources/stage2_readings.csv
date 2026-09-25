@@ -1,0 +1,2 @@
+device_id,reading_id,location,status_code,passthrough_code,null_code,error_code,measurement,rounded_input,missing_input,bad_input
+DEVICE-A,READ-001,bench-west,"  ACTIVE  ","  unknown  ",UNKNOWN,KNOWN,4,5,,not-a-number

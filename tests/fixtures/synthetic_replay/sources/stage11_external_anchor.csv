@@ -1,0 +1,5 @@
+project,cimac_part_id,Cimac.id,Collection_Event,raw_none,raw_text,raw_numeric,status_code
+other,IGNORED,OTHER-000,elsewhere,ignored,ignored,99,ACTIVE
+alpha,DEVICE-A,READ-001,bench-west,plain,"  spaced   text  ",12.5,ACTIVE
+alpha,DEVICE-A,READ-002,bench-east,second,,7,UNKNOWN
+alpha,DEVICE-B,READ-003,bench-null,third,text,0," "

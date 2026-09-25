@@ -1,0 +1,53 @@
+schema_id: synthetic/device_stage7
+schema_version: 1.0.0
+title: Synthetic source-independent declared-absence replay
+row_key: [device_id, reading_id]
+column_order:
+  - device_id
+  - reading_id
+  - location
+  - absence_not_applicable
+  - absence_source_missing
+  - absence_state_none
+  - absence_raw_none
+  - absence_raw_value
+  - absence_raw_coerced
+  - absence_default_origin
+  - absence_literal_key
+  - absence_no_value_rule
+  - source_missing_time
+  - source_missing_stat
+  - not_applicable_time
+  - not_applicable_stat
+  - pfs_source_missing
+  - pfs_not_applicable
+  - source_attributed_absence
+  - anchor_absence
+  - derived_absence
+  - unsupported_no_mapping
+  - downstream_blocked
+fields:
+  - {name: device_id, type: string, nullable: false}
+  - {name: reading_id, type: string, nullable: false}
+  - {name: location, type: string, nullable: false}
+  - {name: absence_not_applicable, type: string, nullable: true}
+  - {name: absence_source_missing, type: string, nullable: true}
+  - {name: absence_state_none, type: string, nullable: true}
+  - {name: absence_raw_none, type: string, nullable: true}
+  - {name: absence_raw_value, type: string, nullable: true}
+  - {name: absence_raw_coerced, type: string, nullable: true}
+  - {name: absence_default_origin, type: string, nullable: true}
+  - {name: absence_literal_key, type: string, nullable: true}
+  - {name: absence_no_value_rule, type: string, nullable: true}
+  - {name: source_missing_time, type: number, nullable: true}
+  - {name: source_missing_stat, type: integer, nullable: true}
+  - {name: not_applicable_time, type: number, nullable: true}
+  - {name: not_applicable_stat, type: integer, nullable: true}
+  - {name: pfs_source_missing, type: integer, nullable: true}
+  - {name: pfs_not_applicable, type: integer, nullable: true}
+  - {name: source_attributed_absence, type: string, nullable: true}
+  - {name: anchor_absence, type: string, nullable: true}
+  - {name: derived_absence, type: string, nullable: true}
+  - {name: unsupported_no_mapping, type: string, nullable: true}
+  - {name: downstream_blocked, type: integer, nullable: true}
+null_encoding: ""

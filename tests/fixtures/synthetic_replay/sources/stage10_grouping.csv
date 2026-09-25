@@ -1,0 +1,5 @@
+cimac_part_id,Cimac.id,Collection_Event
+DEVICE-A,READ-001,  bench   west  
+DEVICE-A,READ-001,  bench   west  
+DEVICE-B,READ-002,bench-east
+DEVICE-N,READ-003, 42 

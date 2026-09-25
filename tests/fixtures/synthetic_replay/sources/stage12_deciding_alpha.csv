@@ -1,0 +1,5 @@
+device_id,decision_note
+DEVICE-A,alpha
+DEVICE-BOTH,alpha
+DEVICE-DUP,alpha-first
+DEVICE-DUP,alpha-second

@@ -1,0 +1,175 @@
+spec_id: synthetic/device_stage5_vocabulary
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage5, version: 1.0.0}
+status: approved
+description: Runtime vocabulary evidence and narrow Stage 2/3 replay fixture.
+sources:
+  - id: readings
+    path: tests/fixtures/synthetic_replay/sources/stage5_readings.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage5_readings.csv
+    record_keys: [device_id, reading_id]
+    participant_column: device_id
+record:
+  anchor: external
+  participant_key: device_id
+  sample_key: reading_id
+  collection_event_key: location
+  duplicates: {policy: error, by: [device_id, reading_id]}
+mappings:
+  - mapping_id: map.inline
+    target: inline_label
+    op: value_map
+    source: readings
+    column: inline_code
+    map: {EXACT: inline-wins}
+    fallback_vocabulary: synthetic/stage5_ordered@1.0.0
+    on_unmapped: error
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    unmapped_rule: {id: map.unmapped.v1, version: 1, review_status: approved}
+    confidence: {value: 0.91, no_value: 0.41, unmapped: 0.31}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.overlap
+    target: overlap_label
+    op: value_map
+    source: readings
+    column: overlap_code
+    map: {}
+    fallback_vocabulary: synthetic/stage5_ordered@1.0.0
+    on_unmapped: error
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.91, no_value: 0.41, unmapped: 0.31}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.exact
+    target: exact_label
+    op: value_map
+    source: readings
+    column: exact_code
+    map: {}
+    fallback_vocabulary: synthetic/stage5_ordered@1.0.0
+    on_unmapped: error
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.91, no_value: 0.41, unmapped: 0.31}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.iexact
+    target: iexact_label
+    op: value_map
+    source: readings
+    column: iexact_code
+    map: {}
+    fallback_vocabulary: synthetic/stage5_ordered@1.0.0
+    on_unmapped: error
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.91, no_value: 0.41, unmapped: 0.31}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.prefix
+    target: prefix_label
+    op: value_map
+    source: readings
+    column: prefix_code
+    map: {}
+    fallback_vocabulary: synthetic/stage5_ordered@1.0.0
+    on_unmapped: error
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.91, no_value: 0.41, unmapped: 0.31}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.contains
+    target: contains_label
+    op: value_map
+    source: readings
+    column: contains_code
+    map: {}
+    fallback_vocabulary: synthetic/stage5_ordered@1.0.0
+    on_unmapped: error
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.91, no_value: 0.41, unmapped: 0.31}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.regex
+    target: regex_label
+    op: value_map
+    source: readings
+    column: regex_code
+    map: {}
+    fallback_vocabulary: synthetic/stage5_ordered@1.0.0
+    on_unmapped: error
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.91, no_value: 0.41, unmapped: 0.31}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.passthrough
+    target: passthrough_label
+    op: value_map
+    source: readings
+    column: passthrough_code
+    map: {}
+    fallback_vocabulary: synthetic/stage5_ordered@1.0.0
+    on_unmapped: error
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.91, no_value: 0.41, unmapped: 0.31}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.unmapped
+    target: unmapped_label
+    op: value_map
+    source: readings
+    column: unmapped_code
+    map: {}
+    fallback_vocabulary: synthetic/stage5_ordered@1.0.0
+    on_unmapped: "null"
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    unmapped_rule: {id: map.unmapped.v1, version: 1, review_status: approved}
+    confidence: {value: 0.91, no_value: 0.41, unmapped: 0.31}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.no_value
+    target: no_value_label
+    op: value_map
+    source: readings
+    column: no_value_code
+    map: {}
+    fallback_vocabulary: synthetic/stage5_ordered@1.0.0
+    on_unmapped: "null"
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    unmapped_rule: {id: map.unmapped.v1, version: 1, review_status: approved}
+    confidence: {value: 0.91, no_value: 0.41, unmapped: 0.31}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: direct.response
+    target: response
+    op: direct
+    source: readings
+    column: response
+    coerce: text
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: {value: 1.0, no_value: 1.0}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: custom.bucket
+    target: response_bucket
+    op: custom_rule
+    inputs: [response]
+    output_type: string
+    params:
+      rules: {$vocabulary: synthetic/stage5_buckets@1.0.0}
+    rule: {id: synthetic.bucket.v1, version: 1, review_status: approved}
+    no_value_rule: {id: synthetic.bucket.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: from_rule, no_value: 0.2}
+    provenance: {record_key_from: participant}
+  - mapping_id: custom.downstream
+    target: downstream_bucket
+    op: custom_rule
+    inputs: [response_bucket]
+    output_type: string
+    params: {}
+    rule: {id: synthetic.downstream.v1, version: 1, review_status: approved}
+    no_value_rule: {id: synthetic.downstream.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: from_rule, no_value: 0.2}
+    provenance: {record_key_from: participant}

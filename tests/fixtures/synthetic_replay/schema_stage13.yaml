@@ -1,0 +1,29 @@
+schema_id: synthetic/device_stage13
+schema_version: 1.0.0
+title: Synthetic exact-byte XLSX replay
+row_key: [device_id, reading_id]
+column_order:
+  - device_id
+  - reading_id
+  - location
+  - direct_none
+  - direct_text
+  - direct_numeric
+  - inline_label
+  - converted_value
+  - vocabulary_label
+  - recursive_one
+  - recursive_multi
+fields:
+  - {name: device_id, type: string, nullable: false}
+  - {name: reading_id, type: string, nullable: false}
+  - {name: location, type: string, nullable: false}
+  - {name: direct_none, type: string, nullable: true}
+  - {name: direct_text, type: string, nullable: true}
+  - {name: direct_numeric, type: number, nullable: true}
+  - {name: inline_label, type: string, nullable: true}
+  - {name: converted_value, type: number, nullable: true}
+  - {name: vocabulary_label, type: string, nullable: true}
+  - {name: recursive_one, type: number, nullable: true}
+  - {name: recursive_multi, type: number, nullable: true}
+null_encoding: ""

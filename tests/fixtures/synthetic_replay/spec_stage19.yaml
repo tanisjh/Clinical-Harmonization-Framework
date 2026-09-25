@@ -1,0 +1,91 @@
+spec_id: synthetic/device_stage19_construction
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage19, version: 1.0.0}
+status: approved
+description: Grouping construction and record-origin strict replay fixture.
+sources:
+  - id: readings
+    path: tests/fixtures/synthetic_replay/sources/stage10_grouping.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage19_grouping.csv
+    record_keys: [cimac_part_id, Cimac.id, Collection_Event]
+    participant_column: cimac_part_id
+  - id: participants
+    path: tests/fixtures/synthetic_replay/sources/stage10_participants.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage19_participants.csv
+    record_keys: [cimac_part_id]
+    participant_column: cimac_part_id
+record:
+  anchor: grouping
+  anchor_source: readings
+  participant_key: cimac_part_id
+  sample_key: Cimac.id
+  collection_event_key: Collection_Event
+  duplicates: {policy: first, by: [cimac_part_id]}
+  grouping:
+    key_columns: [cimac_part_id, Cimac.id, Collection_Event]
+    select: first_row
+    anchor_fields:
+      cimac_part_id: cimac_part_id
+      Cimac.id: Cimac.id
+      Collection_Event: Collection_Event
+  additional_records:
+    - id: missing_reading
+      participants_from: participants
+      when: no_record_for_participant
+      values:
+        Cimac.id: SYNTH-000
+        Collection_Event: declared-event
+      rule: {id: record.no_reading.v1, version: 1, review_status: approved}
+conditions:
+  - id: record_was_observed
+    record_origin: observed
+  - id: record_was_declared
+    record_origin: synthesized
+mappings:
+  - mapping_id: construction.grouped_value
+    target: grouped_value
+    op: direct
+    source: readings
+    column: Collection_Event
+    coerce: none
+    confidence: 1.0
+    provenance: {record_key_from: group}
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    derivation:
+      - record:
+          kind: anchor_from_grouping
+          n_source_rows: {$ref: anchor_group_size}
+          selected_row: {$ref: anchor_selected_row}
+          final_value: {$ref: value}
+  - mapping_id: origin.observed
+    target: origin_value
+    when: record_was_observed
+    op: direct
+    source: readings
+    column: Collection_Event
+    coerce: none
+    confidence: 1.0
+    provenance: {record_key_from: group}
+    rule: {id: direct.observed.v1, version: 1, review_status: approved}
+  - mapping_id: origin.synthesized
+    target: origin_value
+    when: record_was_declared
+    op: constant
+    value: declared
+    column: origin_value
+    confidence: 1.0
+    provenance:
+      source_label: SPEC:synthesized
+      record_key_from: participant
+    rule: {id: constant.synthesized.v1, version: 1, review_status: approved}
+    derivation:
+      - record:
+          kind: synthesized_anchor
+          final_value: {$ref: value}
+          source_row_exists: false

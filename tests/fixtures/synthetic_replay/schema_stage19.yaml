@@ -1,0 +1,17 @@
+schema_id: synthetic/device_stage19
+schema_version: 1.0.0
+title: Synthetic Stage 19 construction replay
+row_key: [cimac_part_id, Cimac.id, Collection_Event]
+column_order:
+  - cimac_part_id
+  - Cimac.id
+  - Collection_Event
+  - grouped_value
+  - origin_value
+fields:
+  - {name: cimac_part_id, type: string, nullable: false}
+  - {name: Cimac.id, type: string, nullable: false}
+  - {name: Collection_Event, type: string, nullable: false}
+  - {name: grouped_value, type: string, nullable: true}
+  - {name: origin_value, type: string, nullable: true}
+null_encoding: ""

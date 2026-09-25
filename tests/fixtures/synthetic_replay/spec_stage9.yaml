@@ -1,0 +1,76 @@
+spec_id: synthetic/device_stage9_grouping_anchor
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage9, version: 1.0.0}
+status: approved
+description: Grouping-anchor no-mapping strict replay fixture.
+sources:
+  - id: readings
+    path: tests/fixtures/synthetic_replay/sources/stage9_grouping.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage9_grouping.csv
+    record_keys: [cimac_part_id, Cimac.id, Collection_Event]
+    participant_column: cimac_part_id
+  - id: participants
+    path: tests/fixtures/synthetic_replay/sources/stage9_participants.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage9_participants.csv
+    record_keys: [cimac_part_id]
+    participant_column: cimac_part_id
+record:
+  anchor: grouping
+  anchor_source: readings
+  participant_key: cimac_part_id
+  sample_key: Cimac.id
+  collection_event_key: Collection_Event
+  duplicates: {policy: first, by: [cimac_part_id]}
+  grouping:
+    key_columns: [cimac_part_id, Cimac.id, Collection_Event]
+    select: first_row
+    anchor_fields:
+      cimac_part_id: cimac_part_id
+      Cimac.id: Cimac.id
+      Collection_Event: Collection_Event
+  additional_records:
+    - id: missing_reading
+      participants_from: participants
+      when: no_record_for_participant
+      values: {Cimac.id: SYNTH-000, Collection_Event: unmeasured}
+      rule: {id: record.no_reading.v1, version: 1, review_status: approved}
+mappings:
+  - mapping_id: no_mapping.blank
+    target: unmapped_blank
+    op: no_mapping_configured
+    source: $anchor
+    column: Collection_Event
+    rule: {id: mapping.unavailable.v1, version: 1, review_status: approved}
+    confidence: 0.4
+    provenance: {value_state: none}
+  - mapping_id: no_mapping.source_missing
+    target: unmapped_source_missing
+    op: no_mapping_configured
+    source: $anchor
+    column: Collection_Event
+    value_state: source_missing
+    rule: {id: mapping.unavailable.v1, version: 1, review_status: approved}
+    no_value_rule: {id: mapping.no_approved_transform.v1, version: 1, review_status: approved}
+    confidence: {value: 0.7, no_value: 0.1}
+  - mapping_id: anchor.direct.unsupported
+    target: anchor_direct_unsupported
+    op: direct
+    source: $anchor
+    column: Collection_Event
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: 1.0
+  - mapping_id: anchor.value_map.unsupported
+    target: anchor_map_unsupported
+    op: value_map
+    source: $anchor
+    column: Collection_Event
+    map: {bench-west: west, bench-east: east, unmeasured: unknown}
+    on_unmapped: error
+    rule: {id: value_map.location.v1, version: 1, review_status: approved}
+    confidence: 0.9

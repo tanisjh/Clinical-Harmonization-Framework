@@ -1,0 +1,68 @@
+spec_id: synthetic/device_stage11_external_anchor
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage11, version: 1.0.0}
+status: approved
+description: Trusted external-anchor direct and inline map replay fixture.
+sources:
+  - id: attribution
+    path: tests/fixtures/synthetic_replay/sources/stage11_attribution.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage11_attribution.csv
+    record_keys: [cimac_part_id]
+    participant_column: cimac_part_id
+record:
+  anchor: external
+  participant_key: cimac_part_id
+  sample_key: Cimac.id
+  collection_event_key: Collection_Event
+  duplicates: {policy: error, by: [cimac_part_id]}
+mappings:
+  - mapping_id: external.direct.none
+    target: direct_none
+    op: direct
+    source: $anchor
+    column: raw_none
+    coerce: none
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: 1.0
+  - mapping_id: external.direct.text
+    target: direct_text
+    op: direct
+    source: $anchor
+    column: raw_text
+    coerce: text
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    no_value_rule: {id: direct.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.2}
+  - mapping_id: external.direct.numeric
+    target: direct_numeric
+    op: direct
+    source: $anchor
+    column: raw_numeric
+    coerce: numeric
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    no_value_rule: {id: direct.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.8, no_value: 0.2}
+  - mapping_id: external.direct.dual
+    target: direct_dual
+    op: direct
+    source: $anchor
+    column: raw_none
+    coerce: none
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: 1.0
+    provenance: {source_ref: attribution, row_number: none}
+  - mapping_id: external.map.status
+    target: status_label
+    op: value_map
+    source: $anchor
+    column: status_code
+    map: {ACTIVE: ready, INACTIVE: stopped}
+    on_unmapped: "null"
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    unmapped_rule: {id: map.unmapped.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.4, unmapped: 0.3}

@@ -1,0 +1,112 @@
+spec_id: synthetic/device_stage2_scalar
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage2, version: 1.0.0}
+status: approved
+description: Stage 2 mappings over non-clinical synthetic device readings.
+sources:
+  - id: readings
+    path: tests/fixtures/synthetic_replay/sources/stage2_readings.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage2_readings.csv
+    record_keys: [device_id, reading_id]
+    participant_column: device_id
+record:
+  anchor: external
+  participant_key: device_id
+  sample_key: reading_id
+  collection_event_key: location
+  duplicates: {policy: error, by: [device_id, reading_id]}
+mappings:
+  - mapping_id: map.status
+    target: status_label
+    op: value_map
+    source: readings
+    column: status_code
+    map: {ACTIVE: ready, INACTIVE: stopped}
+    on_unmapped: error
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    unmapped_rule: {id: map.unmapped.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.4, unmapped: 0.3}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.passthrough
+    target: passthrough_label
+    op: value_map
+    source: readings
+    column: passthrough_code
+    map: {KNOWN: known}
+    on_unmapped: passthrough
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    unmapped_rule: {id: map.unmapped.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.4, unmapped: 0.3}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.null
+    target: null_label
+    op: value_map
+    source: readings
+    column: null_code
+    map: {KNOWN: known}
+    on_unmapped: "null"
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    unmapped_rule: {id: map.unmapped.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.4, unmapped: 0.3}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.error
+    target: error_label
+    op: value_map
+    source: readings
+    column: error_code
+    map: {KNOWN: known}
+    on_unmapped: error
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.4, unmapped: 0.3}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: unit.basic
+    target: converted_measurement
+    op: unit_conversion
+    source: readings
+    column: measurement
+    factor: 2.5
+    round: false
+    rule: {id: unit.convert.v1, version: 1, review_status: approved}
+    no_value_rule: {id: unit.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.95, no_value: 0.5}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: unit.rounded
+    target: rounded_measurement
+    op: unit_conversion
+    source: readings
+    column: rounded_input
+    factor: 0.5
+    round: true
+    rule: {id: unit.convert.v1, version: 1, review_status: approved}
+    no_value_rule: {id: unit.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.95, no_value: 0.5}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: unit.missing
+    target: missing_measurement
+    op: unit_conversion
+    source: readings
+    column: missing_input
+    factor: 2.0
+    round: false
+    rule: {id: unit.convert.v1, version: 1, review_status: approved}
+    no_value_rule: {id: unit.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.95, no_value: 0.5}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: unit.bad
+    target: bad_measurement
+    op: unit_conversion
+    source: readings
+    column: bad_input
+    factor: 2.0
+    round: false
+    rule: {id: unit.convert.v1, version: 1, review_status: approved}
+    no_value_rule: {id: unit.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.95, no_value: 0.5}
+    provenance: {record_key_from: participant, row_number: source}

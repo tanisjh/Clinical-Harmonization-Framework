@@ -1,0 +1,56 @@
+spec_id: synthetic/device_readings_direct
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_readings, version: 1.0.0}
+status: approved
+description: Direct mappings for non-clinical calibrated device readings.
+sources:
+  - id: readings
+    path: tests/fixtures/synthetic_replay/sources/device_readings.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: device_readings.csv
+    record_keys: [device_id, reading_id]
+    participant_column: device_id
+record:
+  anchor: external
+  participant_key: device_id
+  sample_key: reading_id
+  collection_event_key: location
+  duplicates: {policy: error, by: [device_id, reading_id]}
+mappings:
+  - mapping_id: direct.reading_text
+    target: reading_text
+    op: direct
+    source: readings
+    column: reading_text
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: {value: 1.0, no_value: 1.0}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: direct.sequence_number
+    target: sequence_number
+    op: direct
+    source: readings
+    column: sequence_number
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: 1.0
+    coerce: numeric
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: direct.enabled_text
+    target: enabled
+    op: direct
+    source: readings
+    column: enabled
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: 1.0
+    coerce: text
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: direct.optional_note
+    target: optional_note
+    op: direct
+    source: readings
+    column: optional_note
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: {value: 1.0, no_value: 1.0}
+    provenance: {record_key_from: participant, row_number: source}

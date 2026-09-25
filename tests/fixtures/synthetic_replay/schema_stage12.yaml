@@ -1,0 +1,27 @@
+schema_id: synthetic/device_stage12
+schema_version: 1.0.0
+title: Synthetic ordered source-group replay
+row_key: [device_id, reading_id]
+column_order:
+  - device_id
+  - reading_id
+  - location
+  - membership_label
+  - direct_none
+  - direct_text
+  - direct_numeric
+  - status_label
+  - vocabulary_label
+  - recursive_label
+fields:
+  - {name: device_id, type: string, nullable: false}
+  - {name: reading_id, type: string, nullable: false}
+  - {name: location, type: string, nullable: false}
+  - {name: membership_label, type: string, nullable: true}
+  - {name: direct_none, type: string, nullable: true}
+  - {name: direct_text, type: string, nullable: true}
+  - {name: direct_numeric, type: number, nullable: true}
+  - {name: status_label, type: string, nullable: true}
+  - {name: vocabulary_label, type: string, nullable: true}
+  - {name: recursive_label, type: string, nullable: true}
+null_encoding: ""

@@ -1,0 +1,9 @@
+device_id,reading_id,location,candidate_value
+DEVICE-A,READ-A,bench-west,15
+DEVICE-B,READ-B,bench-west,25
+DEVICE-C,READ-C,bench-west,30
+DEVICE-D,READ-D,bench-west,
+DEVICE-E,READ-E,bench-west,45
+DEVICE-F,READ-F,bench-west,55
+DEVICE-G,READ-G,bench-west,65
+DEVICE-H,READ-H,bench-west,75

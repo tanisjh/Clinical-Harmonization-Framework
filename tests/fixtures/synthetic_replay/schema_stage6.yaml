@@ -1,0 +1,51 @@
+schema_id: synthetic/device_stage6
+schema_version: 1.0.0
+title: Synthetic spec-local constant replay
+row_key: [device_id, reading_id]
+column_order:
+  - device_id
+  - reading_id
+  - location
+  - constant_string
+  - constant_integer
+  - constant_float
+  - constant_boolean
+  - constant_null
+  - constant_null_default_rule
+  - constant_transformed
+  - constant_delivered
+  - constant_state_none
+  - constant_raw_none
+  - constant_parent
+  - constant_derived
+  - downstream_blocked
+  - constant_conditional
+  - constant_anchor
+  - absent_declared
+  - no_mapping_value
+  - constant_collection
+  - constant_nonfinite
+fields:
+  - {name: device_id, type: string, nullable: false}
+  - {name: reading_id, type: string, nullable: false}
+  - {name: location, type: string, nullable: false}
+  - {name: constant_string, type: string, nullable: false}
+  - {name: constant_integer, type: integer, nullable: false}
+  - {name: constant_float, type: number, nullable: false}
+  - {name: constant_boolean, type: string, nullable: false}
+  - {name: constant_null, type: string, nullable: true}
+  - {name: constant_null_default_rule, type: string, nullable: true}
+  - {name: constant_transformed, type: string, nullable: false}
+  - {name: constant_delivered, type: string, nullable: false}
+  - {name: constant_state_none, type: string, nullable: false}
+  - {name: constant_raw_none, type: string, nullable: false}
+  - {name: constant_parent, type: string, nullable: false}
+  - {name: constant_derived, type: string, nullable: false}
+  - {name: downstream_blocked, type: string, nullable: true}
+  - {name: constant_conditional, type: string, nullable: false}
+  - {name: constant_anchor, type: string, nullable: false}
+  - {name: absent_declared, type: string, nullable: true}
+  - {name: no_mapping_value, type: string, nullable: true}
+  - {name: constant_collection, type: string, nullable: false}
+  - {name: constant_nonfinite, type: string, nullable: true}
+null_encoding: ""

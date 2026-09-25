@@ -1,0 +1,62 @@
+spec_id: synthetic/device_stage4_fallback
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage4, version: 1.0.0}
+status: approved
+description: Three raw CSV sources in deterministic fallback order.
+sources:
+  - id: primary
+    path: tests/fixtures/synthetic_replay/sources/stage4_primary.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage4_primary.csv
+    record_keys: [device_id, reading_id]
+    participant_column: device_id
+  - id: secondary
+    path: tests/fixtures/synthetic_replay/sources/stage4_secondary.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage4_secondary.csv
+    record_keys: [device_id, reading_id]
+    participant_column: device_id
+  - id: tertiary
+    path: tests/fixtures/synthetic_replay/sources/stage4_tertiary.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage4_tertiary.csv
+    record_keys: [device_id, reading_id]
+    participant_column: device_id
+record:
+  anchor: external
+  participant_key: device_id
+  sample_key: reading_id
+  collection_event_key: location
+  duplicates: {policy: error, by: [device_id, reading_id]}
+mappings:
+  - mapping_id: fallback.raw
+    target: preferred_raw
+    op: fallback
+    candidates:
+      - {source: primary, column: candidate_value}
+      - {source: secondary, column: candidate_value}
+      - {source: tertiary, column: candidate_value}
+    rule: {id: fallback.first_present.v1, version: 1, review_status: approved}
+    no_value_rule: {id: fallback.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.2}
+    coerce: none
+    contributions: {record: all, after_decision: not_evaluated}
+    provenance: {record_key_from: participant}
+  - mapping_id: fallback.numeric
+    target: preferred_measurement
+    op: fallback
+    candidates:
+      - {source: primary, column: candidate_value}
+      - {source: secondary, column: candidate_value}
+      - {source: tertiary, column: candidate_value}
+    rule: {id: fallback.first_present.v1, version: 1, review_status: approved}
+    no_value_rule: {id: fallback.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.2}
+    coerce: numeric
+    contributions: {record: all, after_decision: not_evaluated}
+    provenance: {record_key_from: participant}

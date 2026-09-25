@@ -1,0 +1,8 @@
+vocabulary_id: synthetic/stage5_buckets
+version: 1.0.0
+kind: buckets
+description: Synthetic response buckets for a registered field rule.
+evidence: Non-clinical Stage 5 replay fixture.
+terms:
+  accepted: [GOOD, OK]
+  rejected: [BAD]

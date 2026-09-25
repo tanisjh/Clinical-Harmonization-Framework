@@ -1,0 +1,11 @@
+vocabulary_id: synthetic/stage12_ordered
+version: 1.0.0
+kind: ordered_rules
+description: Non-clinical Stage 12 group-backed vocabulary fixture.
+evidence: Synthetic replay evidence only.
+terms:
+  - match: EXACT
+    kind: exact
+    value: vocabulary-hit
+    confidence: 0.83
+    rule: {id: synthetic.stage12.vocabulary.v1, version: '1'}

@@ -1,0 +1,2 @@
+device_id,reading_id,location,inline_code,overlap_code,exact_code,iexact_code,prefix_code,contains_code,regex_code,passthrough_code,unmapped_code,no_value_code,response
+DEVICE-A,READ-001,bench-west,EXACT,sensor alpha,EXACT,cAsE,pre-value,has middle token,R42,KEEP,UNKNOWN,,GOOD

@@ -1,0 +1,39 @@
+schema_id: synthetic/device_stage5
+schema_version: 1.0.0
+title: Synthetic runtime-vocabulary replay
+row_key: [device_id, reading_id]
+column_order:
+  - device_id
+  - reading_id
+  - location
+  - inline_label
+  - overlap_label
+  - exact_label
+  - iexact_label
+  - prefix_label
+  - contains_label
+  - regex_label
+  - passthrough_label
+  - unmapped_label
+  - no_value_label
+  - response
+  - response_bucket
+  - downstream_bucket
+fields:
+  - {name: device_id, type: string, nullable: false}
+  - {name: reading_id, type: string, nullable: false}
+  - {name: location, type: string, nullable: false}
+  - {name: inline_label, type: string, nullable: true}
+  - {name: overlap_label, type: string, nullable: true}
+  - {name: exact_label, type: string, nullable: true}
+  - {name: iexact_label, type: string, nullable: true}
+  - {name: prefix_label, type: string, nullable: true}
+  - {name: contains_label, type: string, nullable: true}
+  - {name: regex_label, type: string, nullable: true}
+  - {name: passthrough_label, type: string, nullable: true}
+  - {name: unmapped_label, type: string, nullable: true}
+  - {name: no_value_label, type: string, nullable: true}
+  - {name: response, type: string, nullable: true}
+  - {name: response_bucket, type: string, nullable: true}
+  - {name: downstream_bucket, type: string, nullable: true}
+null_encoding: ""

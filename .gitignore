@@ -1,0 +1,37 @@
+# Python environments and caches
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Test runs, workspace-local reports, and patch remnants
+.scratch/
+pytest-*/
+*.orig
+*.rej
+*.junit.xml
+*-junit.xml
+junit*.xml
+
+# Generated harmonization products and externally supplied clinical sources
+harmonization_outputs/
+*-clinical/
+cimac-cidc-*/
+
+# Local configuration/secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Editor and operating-system transients
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.ipynb_checkpoints/

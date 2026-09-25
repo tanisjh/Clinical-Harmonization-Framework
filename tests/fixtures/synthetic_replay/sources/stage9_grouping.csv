@@ -1,0 +1,4 @@
+cimac_part_id,Cimac.id,Collection_Event,arbitrary
+DEVICE-A,READ-001,bench-west,first
+DEVICE-A,READ-001,bench-west,duplicate
+DEVICE-B,READ-002,bench-east,only

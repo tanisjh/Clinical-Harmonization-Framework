@@ -1,0 +1,5 @@
+device_id,direct_none,direct_text,numeric_alpha,status_code,vocab_code
+DEVICE-A,raw-alpha,  spaced   alpha  ,12.5,ON,EXACT
+DEVICE-BOTH,first-wins,  first   member  ,2.5,ON,EXACT
+DEVICE-DUP,duplicate-first, first duplicate ,3.5,ON,EXACT
+DEVICE-DUP,duplicate-second, second duplicate ,99.0,OFF,UNKNOWN

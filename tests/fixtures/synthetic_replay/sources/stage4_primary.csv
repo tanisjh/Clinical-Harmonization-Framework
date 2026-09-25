@@ -1,0 +1,9 @@
+device_id,reading_id,location,candidate_value
+DEVICE-A,READ-A,bench-west,5
+DEVICE-B,READ-B,bench-west,
+DEVICE-C,READ-C,bench-west,
+DEVICE-D,READ-D,bench-west,
+DEVICE-E,READ-E,bench-west,.
+DEVICE-F,READ-F,bench-west,bad
+DEVICE-G,READ-G,bench-west,0
+DEVICE-H,READ-H,bench-west,False

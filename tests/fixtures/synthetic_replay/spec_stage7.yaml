@@ -1,0 +1,199 @@
+spec_id: synthetic/device_stage7_declared_absence
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage7, version: 1.0.0}
+status: approved
+description: Source-independent declared-absence replay fixture.
+sources:
+  - id: readings
+    path: tests/fixtures/synthetic_replay/sources/stage5_readings.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage7_readings.csv
+    record_keys: [device_id, reading_id]
+    participant_column: device_id
+record:
+  anchor: external
+  participant_key: device_id
+  sample_key: reading_id
+  collection_event_key: location
+  duplicates: {policy: error, by: [device_id, reading_id]}
+mappings:
+  - mapping_id: absence.not_applicable
+    target: absence_not_applicable
+    op: not_applicable
+    value_state: not_applicable
+    column: declared_absence
+    artifacts: [synthetic-stage7-delivered]
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.91
+    provenance:
+      source_label: CONFIG:declared_absence
+      record_key_from: participant
+      value_state: declared
+
+  - mapping_id: absence.source_missing
+    target: absence_source_missing
+    op: not_applicable
+    value_state: source_missing
+    rule: {id: absence.source_missing.v1, version: 1, review_status: approved}
+    confidence: 0.42
+    provenance:
+      source_label: (no source mapping)
+      value_state: none
+
+  - mapping_id: absence.state_none
+    target: absence_state_none
+    op: not_applicable
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.92
+    provenance: {value_state: none}
+
+  - mapping_id: absence.raw_none
+    target: absence_raw_none
+    op: not_applicable
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.93
+    provenance: {raw_value: none, row_number: none}
+
+  - mapping_id: absence.raw_value
+    target: absence_raw_value
+    op: not_applicable
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.935
+    provenance: {raw_value: value}
+
+  - mapping_id: absence.raw_coerced
+    target: absence_raw_coerced
+    op: not_applicable
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.94
+    provenance: {raw_value: coerced}
+
+  - mapping_id: absence.default_origin
+    target: absence_default_origin
+    op: not_applicable
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.95
+
+  - mapping_id: absence.literal_key
+    target: absence_literal_key
+    op: not_applicable
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.96
+    provenance: {record_key: config:synthetic.absence_literal_key}
+
+  - mapping_id: absence.no_value_rule
+    target: absence_no_value_rule
+    op: not_applicable
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    no_value_rule: {id: absence.asserted_null.v1, version: 1, review_status: approved}
+    confidence: {value: 0.73, no_value: 0.11}
+
+  - mapping_id: absence.source_missing_time
+    target: source_missing_time
+    op: not_applicable
+    value_state: source_missing
+    rule: {id: absence.source_missing.v1, version: 1, review_status: approved}
+    confidence: 0.3
+    provenance: {source_label: (no source mapping), value_state: none}
+
+  - mapping_id: absence.source_missing_stat
+    target: source_missing_stat
+    op: not_applicable
+    value_state: source_missing
+    rule: {id: absence.source_missing.v1, version: 1, review_status: approved}
+    confidence: 0.3
+    provenance: {source_label: (no source mapping), value_state: none}
+
+  - mapping_id: absence.not_applicable_time
+    target: not_applicable_time
+    op: not_applicable
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.95
+    provenance: {source_label: (measurement not applicable), value_state: none}
+
+  - mapping_id: absence.not_applicable_stat
+    target: not_applicable_stat
+    op: not_applicable
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.95
+    provenance: {source_label: (measurement not applicable), value_state: none}
+
+  - mapping_id: custom.pfs_source_missing
+    target: pfs_source_missing
+    op: custom_rule
+    inputs: [source_missing_time, source_missing_stat]
+    output_type: integer
+    params: {landmark_days: 120}
+    rule: {id: synthetic.pfs_bin_120d.v1, version: 1, review_status: approved}
+    confidence: from_rule
+    provenance: {source_label: DERIVED:source_missing_pfs}
+
+  - mapping_id: custom.pfs_not_applicable
+    target: pfs_not_applicable
+    op: custom_rule
+    inputs: [not_applicable_time, not_applicable_stat]
+    output_type: integer
+    params: {landmark_days: 120}
+    rule: {id: synthetic.pfs_bin_120d.v1, version: 1, review_status: approved}
+    confidence: from_rule
+    provenance: {source_label: DERIVED:not_applicable_pfs}
+
+  - mapping_id: absence.source_attributed
+    target: source_attributed_absence
+    op: not_applicable
+    value_state: source_missing
+    column: (no source column)
+    rule: {id: absence.source_missing.v1, version: 1, review_status: approved}
+    confidence: 0.2
+    provenance: {source_ref: readings, row_number: none, value_state: none}
+
+  - mapping_id: absence.anchor
+    target: anchor_absence
+    op: not_applicable
+    source: $anchor
+    column: location
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.8
+
+  - mapping_id: absence.derived
+    target: derived_absence
+    op: not_applicable
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.8
+    derivation:
+      - record:
+          kind: synthetic_declared_absence
+          final_value: {$ref: value}
+
+  - mapping_id: no_mapping.unsupported
+    target: unsupported_no_mapping
+    op: no_mapping_configured
+    source: readings
+    column: location
+    rule: {id: absence.no_mapping.v1, version: 1, review_status: approved}
+    confidence: 0.2
+    provenance: {record_key_from: participant, row_number: source}
+
+  - mapping_id: custom.downstream_blocked
+    target: downstream_blocked
+    op: custom_rule
+    inputs: [source_missing_time, unsupported_no_mapping]
+    output_type: integer
+    params: {landmark_days: 120}
+    rule: {id: synthetic.pfs_bin_120d.v1, version: 1, review_status: approved}
+    confidence: from_rule
+    provenance: {source_label: DERIVED:blocked}

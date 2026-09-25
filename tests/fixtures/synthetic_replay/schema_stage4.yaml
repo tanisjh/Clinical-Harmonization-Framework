@@ -1,0 +1,17 @@
+schema_id: synthetic/device_stage4
+schema_version: 1.0.0
+title: Synthetic ordered fallback replay
+row_key: [device_id, reading_id]
+column_order:
+  - device_id
+  - reading_id
+  - location
+  - preferred_raw
+  - preferred_measurement
+fields:
+  - {name: device_id, type: string, nullable: false}
+  - {name: reading_id, type: string, nullable: false}
+  - {name: location, type: string, nullable: false}
+  - {name: preferred_raw, type: string, nullable: true}
+  - {name: preferred_measurement, type: number, nullable: true}
+null_encoding: ""

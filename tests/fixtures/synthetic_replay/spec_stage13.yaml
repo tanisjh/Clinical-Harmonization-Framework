@@ -1,0 +1,104 @@
+spec_id: synthetic/device_stage13
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage13, version: 1.0.0}
+status: approved
+description: Closed exact-byte XLSX source and existing operation adapters.
+sources:
+  - id: readings
+    path: tests/fixtures/synthetic_replay/sources/stage13_placeholder.xlsx
+    file_type: xlsx
+    reader: xlsx_openpyxl@v1
+    sheet: Readings
+    logical_label: stage13_readings.xlsx
+    record_keys: [device_id]
+    participant_column: device_id
+record:
+  anchor: external
+  participant_key: device_id
+  sample_key: reading_id
+  collection_event_key: location
+  duplicates: {policy: first, by: [device_id]}
+mappings:
+  - mapping_id: direct.none
+    target: direct_none
+    op: direct
+    source: readings
+    column: raw_none
+    coerce: none
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: {value: 1.0, no_value: 1.0}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: direct.text
+    target: direct_text
+    op: direct
+    source: readings
+    column: raw_text
+    coerce: text
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: {value: 1.0, no_value: 1.0}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: direct.numeric
+    target: direct_numeric
+    op: direct
+    source: readings
+    column: raw_numeric
+    coerce: numeric
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: {value: 1.0, no_value: 1.0}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.inline
+    target: inline_label
+    op: value_map
+    source: readings
+    column: inline_code
+    map: {A: mapped-a}
+    on_unmapped: error
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.4}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: unit.convert
+    target: converted_value
+    op: unit_conversion
+    source: readings
+    column: raw_units
+    factor: 30.0
+    round: false
+    rule: {id: unit.convert.v1, version: 1, review_status: approved}
+    no_value_rule: {id: unit.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.95, no_value: 0.3}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: map.vocabulary
+    target: vocabulary_label
+    op: value_map
+    source: readings
+    column: vocabulary_code
+    map: {}
+    fallback_vocabulary: synthetic/stage13_ordered@1.0.0
+    on_unmapped: error
+    rule: {id: map.inline.v1, version: 1, review_status: approved}
+    no_value_rule: {id: map.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.4}
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: custom.one
+    target: recursive_one
+    op: custom_rule
+    inputs: [direct_numeric]
+    output_type: number
+    params: {}
+    rule: {id: synthetic.stage13.one.v1, version: 1, review_status: approved}
+    no_value_rule: {id: synthetic.stage13.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: from_rule, no_value: 0.2}
+    provenance: {record_key_from: participant}
+  - mapping_id: custom.multi
+    target: recursive_multi
+    op: custom_rule
+    inputs: [recursive_one, converted_value]
+    output_type: number
+    params: {}
+    rule: {id: synthetic.stage13.multi.v1, version: 1, review_status: approved}
+    no_value_rule: {id: synthetic.stage13.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: from_rule, no_value: 0.2}
+    provenance: {record_key_from: participant}

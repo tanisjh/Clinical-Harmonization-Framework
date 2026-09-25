@@ -1,0 +1,109 @@
+spec_id: synthetic/device_stage8_attributed_absence
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage8, version: 1.0.0}
+status: approved
+description: Source-attributed declared-absence replay fixture.
+sources:
+  - id: readings
+    path: tests/fixtures/synthetic_replay/sources/stage8_attribution.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage8_attribution.csv
+    record_keys: [device_id, reading_id]
+    participant_column: device_id
+    on_missing_record: {mode: omit}
+record:
+  anchor: external
+  participant_key: device_id
+  sample_key: reading_id
+  collection_event_key: location
+  duplicates: {policy: error, by: [device_id, reading_id]}
+mappings:
+  - mapping_id: attributed.not_applicable
+    target: attributed_not_applicable
+    op: not_applicable
+    value_state: not_applicable
+    column: (no applicability column)
+    artifacts: [synthetic-stage8-delivered]
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.91
+    provenance:
+      source_ref: readings
+      row_number: none
+      record_key_from: participant
+      value_state: declared
+
+  - mapping_id: attributed.source_missing
+    target: attributed_source_missing
+    op: not_applicable
+    value_state: source_missing
+    column: (no measured state column)
+    rule: {id: absence.source_missing.v1, version: 1, review_status: approved}
+    confidence: {value: 0.42, no_value: 0.07}
+    provenance:
+      source_ref: readings
+      row_number: none
+      raw_value: coerced
+      value_state: none
+
+  - mapping_id: attributed.literal_key
+    target: attributed_literal_key
+    op: not_applicable
+    value_state: not_applicable
+    column: (no literal-key value)
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.88
+    provenance:
+      source_ref: readings
+      row_number: none
+      record_key: config:stage8.literal
+
+  - mapping_id: attributed.raw_none
+    target: attributed_raw_none
+    op: not_applicable
+    value_state: not_applicable
+    column: (no raw value)
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.87
+    provenance:
+      source_ref: readings
+      row_number: none
+      raw_value: none
+
+  - mapping_id: attributed.default_column
+    target: attributed_default_column
+    op: not_applicable
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.86
+    provenance: {source_ref: readings, row_number: none}
+
+  - mapping_id: attributed.no_value_rule
+    target: attributed_no_value_rule
+    op: not_applicable
+    value_state: source_missing
+    column: (no approved measurement)
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    no_value_rule: {id: absence.asserted_null.v1, version: 1, review_status: approved}
+    confidence: {value: 0.73, no_value: 0.11}
+    provenance: {source_ref: readings, row_number: none}
+
+  - mapping_id: no_mapping.unsupported
+    target: unsupported_no_mapping
+    op: no_mapping_configured
+    source: $anchor
+    column: location
+    value_state: source_missing
+    rule: {id: absence.no_mapping.v1, version: 1, review_status: approved}
+    confidence: 0.2
+
+  - mapping_id: absence.anchor
+    target: anchor_absence
+    op: not_applicable
+    source: $anchor
+    column: location
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.8

@@ -1,0 +1,21 @@
+schema_id: synthetic/device_stage9
+schema_version: 1.0.0
+title: Synthetic grouping-anchor no-mapping replay
+row_key: [cimac_part_id, Cimac.id, Collection_Event]
+column_order:
+  - cimac_part_id
+  - Cimac.id
+  - Collection_Event
+  - unmapped_blank
+  - unmapped_source_missing
+  - anchor_direct_unsupported
+  - anchor_map_unsupported
+fields:
+  - {name: cimac_part_id, type: string, nullable: false}
+  - {name: Cimac.id, type: string, nullable: false}
+  - {name: Collection_Event, type: string, nullable: false}
+  - {name: unmapped_blank, type: string, nullable: true}
+  - {name: unmapped_source_missing, type: string, nullable: true}
+  - {name: anchor_direct_unsupported, type: string, nullable: true}
+  - {name: anchor_map_unsupported, type: string, nullable: true}
+null_encoding: ""

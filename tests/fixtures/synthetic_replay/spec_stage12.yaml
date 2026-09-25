@@ -1,0 +1,119 @@
+spec_id: synthetic/device_stage12_group
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage12, version: 1.0.0}
+status: approved
+description: Non-clinical ordered source-group replay fixture.
+sources:
+  - id: deciding_alpha
+    path: tests/fixtures/synthetic_replay/sources/stage12_deciding_alpha.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage12_deciding_alpha.csv
+    participant_column: device_id
+    record_keys: [device_id]
+  - id: deciding_beta
+    path: tests/fixtures/synthetic_replay/sources/stage12_deciding_beta.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage12_deciding_beta.csv
+    participant_column: device_id
+    record_keys: [device_id]
+  - id: scalar_alpha
+    path: tests/fixtures/synthetic_replay/sources/stage12_scalar_alpha.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage12_scalar_alpha.csv
+    participant_column: device_id
+    record_keys: [device_id]
+  - id: scalar_beta
+    path: tests/fixtures/synthetic_replay/sources/stage12_scalar_beta.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage12_scalar_beta.csv
+    participant_column: device_id
+    record_keys: [device_id]
+source_groups:
+  - id: cohort
+    select: first_containing_record
+    decided_by: membership
+    evidence_ref: synthetic.stage12.member_values
+    rule: {id: synthetic.stage12.group_select.v1, version: '1'}
+    members:
+      - id: alpha
+        value: alpha-value
+        sources: {membership: deciding_alpha, scalar: scalar_alpha}
+      - id: beta
+        value: beta-value
+        sources: {membership: deciding_beta, scalar: scalar_beta}
+record:
+  anchor: external
+  participant_key: device_id
+  sample_key: reading_id
+  collection_event_key: location
+  duplicates: {policy: first, by: [device_id]}
+mappings:
+  - mapping_id: group.membership
+    target: membership_label
+    op: file_membership
+    group: cohort
+    column: (cohort_membership)
+    confidence: 0.95
+    rule: {id: synthetic.stage12.file_membership.v1, version: '1'}
+  - mapping_id: group.direct.none
+    target: direct_none
+    op: direct
+    source: cohort.scalar
+    column: direct_none
+    coerce: none
+    confidence: {value: 0.95, no_value: 0.0}
+    rule: {id: synthetic.stage12.direct.none.v1, version: '1'}
+  - mapping_id: group.direct.text
+    target: direct_text
+    op: direct
+    source: cohort.scalar
+    column: direct_text
+    coerce: text
+    confidence: {value: 0.95, no_value: 0.0}
+    rule: {id: synthetic.stage12.direct.text.v1, version: '1'}
+  - mapping_id: group.direct.numeric
+    target: direct_numeric
+    op: direct
+    source: cohort.scalar
+    column: numeric_alpha
+    column_by_member: {alpha: numeric_alpha, beta: numeric_beta}
+    coerce: numeric
+    confidence: {value: 0.95, no_value: 0.0}
+    rule: {id: synthetic.stage12.direct.numeric.v1, version: '1'}
+  - mapping_id: group.map.inline
+    target: status_label
+    op: value_map
+    source: cohort.scalar
+    column: status_code
+    map: {"ON": ready}
+    on_unmapped: "null"
+    confidence: {value: 0.91, unmapped: 0.31, no_value: 0.21}
+    rule: {id: synthetic.stage12.map.inline.v1, version: '1'}
+    unmapped_rule: {id: synthetic.stage12.map.unmapped.v1, version: '1'}
+    no_value_rule: {id: synthetic.stage12.map.no_value.v1, version: '1'}
+  - mapping_id: group.map.vocabulary
+    target: vocabulary_label
+    op: value_map
+    source: cohort.scalar
+    column: vocab_code
+    map: {}
+    fallback_vocabulary: synthetic/stage12_ordered@1.0.0
+    on_unmapped: "null"
+    confidence: {value: 0.91, unmapped: 0.31, no_value: 0.21}
+    rule: {id: synthetic.stage12.map.inline.v1, version: '1'}
+    unmapped_rule: {id: synthetic.stage12.map.unmapped.v1, version: '1'}
+    no_value_rule: {id: synthetic.stage12.map.no_value.v1, version: '1'}
+  - mapping_id: group.recursive
+    target: recursive_label
+    op: custom_rule
+    inputs: [direct_text]
+    output_type: string
+    params: {}
+    confidence: {value: from_rule, no_value: 0.2}
+    rule: {id: synthetic.stage12.identity.v1, version: '1'}

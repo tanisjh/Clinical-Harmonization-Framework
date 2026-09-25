@@ -1,0 +1,15 @@
+schema_id: synthetic/device_stage8_group
+schema_version: 1.0.0
+title: Synthetic grouped source-attributed declared absence replay
+row_key: [cimac_part_id, Cimac.id]
+column_order:
+  - cimac_part_id
+  - Cimac.id
+  - Collection_Event
+  - attributed_group_key
+fields:
+  - {name: cimac_part_id, type: string, nullable: false}
+  - {name: Cimac.id, type: string, nullable: false}
+  - {name: Collection_Event, type: string, nullable: true}
+  - {name: attributed_group_key, type: string, nullable: true}
+null_encoding: ""

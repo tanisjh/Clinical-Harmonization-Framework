@@ -1,0 +1,29 @@
+schema_id: synthetic/device_stage2
+schema_version: 1.0.0
+title: Synthetic scalar replay outcomes
+row_key: [device_id, reading_id]
+column_order:
+  - device_id
+  - reading_id
+  - location
+  - status_label
+  - passthrough_label
+  - null_label
+  - error_label
+  - converted_measurement
+  - rounded_measurement
+  - missing_measurement
+  - bad_measurement
+fields:
+  - {name: device_id, type: string, nullable: false}
+  - {name: reading_id, type: string, nullable: false}
+  - {name: location, type: string, nullable: false}
+  - {name: status_label, type: string, nullable: true}
+  - {name: passthrough_label, type: string, nullable: true}
+  - {name: null_label, type: string, nullable: true}
+  - {name: error_label, type: string, nullable: true}
+  - {name: converted_measurement, type: number, nullable: true}
+  - {name: rounded_measurement, type: number, nullable: true}
+  - {name: missing_measurement, type: number, nullable: true}
+  - {name: bad_measurement, type: number, nullable: true}
+null_encoding: ""

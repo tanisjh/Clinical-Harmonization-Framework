@@ -1,0 +1,11 @@
+vocabulary_id: synthetic/stage13_ordered
+version: 1.0.0
+kind: ordered_rules
+description: Synthetic Stage 13 ordered vocabulary.
+evidence: Non-clinical replay fixture only.
+terms:
+  - match: SPECIAL
+    kind: exact
+    value: vocabulary-hit
+    confidence: 0.83
+    rule: {id: synthetic.stage13.vocabulary.v1, version: '1'}

@@ -1,0 +1,23 @@
+schema_id: synthetic/device_stage11
+schema_version: 1.0.0
+title: Synthetic trusted external-anchor replay
+row_key: [cimac_part_id, Cimac.id, Collection_Event]
+column_order:
+  - cimac_part_id
+  - Cimac.id
+  - Collection_Event
+  - direct_none
+  - direct_text
+  - direct_numeric
+  - direct_dual
+  - status_label
+fields:
+  - {name: cimac_part_id, type: string, nullable: false}
+  - {name: Cimac.id, type: string, nullable: false}
+  - {name: Collection_Event, type: string, nullable: false}
+  - {name: direct_none, type: string, nullable: true}
+  - {name: direct_text, type: string, nullable: true}
+  - {name: direct_numeric, type: number, nullable: true}
+  - {name: direct_dual, type: string, nullable: true}
+  - {name: status_label, type: string, nullable: true}
+null_encoding: ""

@@ -1,0 +1,6 @@
+config_id: synthetic/device_calibration
+config_version: 1.0.0
+thresholds:
+  reading_text: 1.0
+  sequence_number: 1.0
+  optional_note: 1.0

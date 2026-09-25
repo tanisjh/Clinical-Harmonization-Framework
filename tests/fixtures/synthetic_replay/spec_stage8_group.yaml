@@ -1,0 +1,41 @@
+spec_id: synthetic/device_stage8_grouped_attribution
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage8_group, version: 1.0.0}
+status: approved
+description: Group-key source-attributed declared-absence replay fixture.
+sources:
+  - id: readings
+    path: tests/fixtures/synthetic_replay/sources/stage8_attribution.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage8_attribution.csv
+    record_keys: [device_id, reading_id]
+    participant_column: device_id
+record:
+  anchor: grouping
+  anchor_source: readings
+  participant_key: cimac_part_id
+  sample_key: Cimac.id
+  collection_event_key: Collection_Event
+  duplicates: {policy: first, by: [device_id]}
+  grouping:
+    key_columns: [device_id, reading_id]
+    select: first_row
+    anchor_fields:
+      cimac_part_id: device_id
+      Cimac.id: reading_id
+mappings:
+  - mapping_id: attributed.group_key
+    target: attributed_group_key
+    op: not_applicable
+    value_state: source_missing
+    column: (no group-level identifier)
+    rule: {id: absence.source_missing.v1, version: 1, review_status: approved}
+    confidence: 0.25
+    provenance:
+      source_ref: readings
+      row_number: none
+      record_key_from: group
+      value_state: none

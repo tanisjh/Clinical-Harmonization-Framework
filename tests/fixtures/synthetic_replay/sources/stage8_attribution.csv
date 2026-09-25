@@ -1,0 +1,3 @@
+device_id,reading_id,location,unrelated_value
+DEVICE-A,READ-001,bench-west,alpha
+DEVICE-B,READ-002,bench-east,beta

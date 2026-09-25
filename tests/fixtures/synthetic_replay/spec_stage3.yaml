@@ -1,0 +1,77 @@
+spec_id: synthetic/device_stage3_derived
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage3, version: 1.0.0}
+status: approved
+description: Two source-backed measurements and one test-only registered derivation.
+sources:
+  - id: readings
+    path: tests/fixtures/synthetic_replay/sources/stage3_readings.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: stage3_readings.csv
+    record_keys: [device_id, reading_id]
+    participant_column: device_id
+record:
+  anchor: external
+  participant_key: device_id
+  sample_key: reading_id
+  collection_event_key: location
+  duplicates: {policy: error, by: [device_id, reading_id]}
+mappings:
+  - mapping_id: direct.base
+    target: base_measurement
+    op: direct
+    source: readings
+    column: base_measurement
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: {value: 1.0, no_value: 1.0}
+    coerce: numeric
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: direct.offset
+    target: calibration_offset
+    op: direct
+    source: readings
+    column: calibration_offset
+    rule: {id: direct.copy.v1, version: 1, review_status: approved}
+    confidence: {value: 1.0, no_value: 1.0}
+    coerce: numeric
+    provenance: {record_key_from: participant, row_number: source}
+  - mapping_id: custom.adjusted
+    target: adjusted_measurement
+    op: custom_rule
+    inputs: [base_measurement, calibration_offset]
+    output_type: number
+    params: {scale: 2.0}
+    rule: {id: synthetic.adjusted.v1, version: 1, review_status: approved}
+    no_value_rule: {id: synthetic.adjusted.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: from_rule, no_value: 0.25}
+    provenance: {record_key_from: participant}
+  - mapping_id: custom.final
+    target: final_measurement
+    op: custom_rule
+    inputs: [adjusted_measurement, base_measurement]
+    output_type: number
+    params: {scale: 0.5}
+    rule: {id: synthetic.adjusted.v1, version: 1, review_status: approved}
+    no_value_rule: {id: synthetic.adjusted.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: from_rule, no_value: 0.25}
+    provenance: {record_key_from: participant}
+  - mapping_id: no_mapping.unsupported
+    target: unsupported_input
+    op: no_mapping_configured
+    source: readings
+    column: base_measurement
+    rule: {id: absence.no_mapping.v1, version: 1, review_status: approved}
+    confidence: 1.0
+  - mapping_id: custom.unsupported_parent
+    target: unsupported_result
+    op: custom_rule
+    inputs: [unsupported_input, base_measurement]
+    output_type: number
+    params: {scale: 1.0}
+    rule: {id: synthetic.adjusted.v1, version: 1, review_status: approved}
+    no_value_rule: {id: synthetic.adjusted.no_value.v1, version: 1, review_status: approved}
+    confidence: {value: from_rule, no_value: 0.25}
+    provenance: {record_key_from: participant}

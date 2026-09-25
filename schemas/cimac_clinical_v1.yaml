@@ -1,0 +1,601 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CIMAC harmonized clinical target schema, version 1.
+#
+# This file is the CIMAC-specific half of the Phase 2a split. The generic half
+# (scripts/lib/schema_model.py, scripts/lib/schema_validator.py) knows about
+# types, vocabularies, bounds and cross-field predicates; it does not know that
+# `clinical_benefit` exists or that `race` may be `white`. Everything specific to
+# this project lives here, so a second harmonization project supplies its own
+# instance and reuses the engine unchanged.
+#
+# It replaces TEMPLATE_COLUMNS (scripts/extract_harmonized_clinical.py) — a
+# plain list of 19 names — as the description of the delivery contract. The list
+# remains the pivot's column order; this file is what the outputs are validated
+# against.
+#
+# EVIDENCE RULE. Every constraint below is justified by one of: the delivered
+# values in the three artifacts as of run 20260807T181932Z-c3c067e5; an
+# implemented rule in scripts/; a recorded reviewer decision; or a statement in
+# repository documentation. No constraint is inferred from general medical
+# knowledge. Where evidence was insufficient, the constraint is omitted and the
+# omission is stated in the field's `evidence` text and in
+# docs/implementation/phase2a_typed_target_schema_2026-08-07.md §"deferred".
+#
+# UNRESOLVED QUESTIONS ARE RECORDED, NOT ENFORCED. Fields touched by an open
+# review question carry `open_questions`, which the validator surfaces at `info`
+# severity only. Q4, Q5, the C12 mappings, the 14C0059G MISSING_0 exclusion, the
+# 10013 keep="first" specimen selection and the pending RAE items are all
+# unchanged and unenforced by this schema.
+# ─────────────────────────────────────────────────────────────────────────────
+
+schema_id: cimac/clinical_target
+schema_version: 1.0.0
+title: CIMAC harmonized clinical target schema
+description: >-
+  The 19-column harmonized clinical table produced by the CIMAC harmonization
+  pipeline, delivered as three artifacts that legitimately disagree on some
+  cells: the 11-trial deliverable, the 9-trial gold deliverable, and the 9-trial
+  template-reproduction QC artifact.
+evidence: >-
+  Profiled from harmonized_11trials.csv (1989 rows), harmonized_9trials_gold.csv
+  (1771 rows) and harmonized_9trials_reproduced.csv (1781 rows) at commit
+  c3c067e, cross-checked against scripts/config/harmonization_config.yaml,
+  scripts/lib/normalize.py, scripts/lib/value_states.py and
+  harmonization_outputs/provenance_long.csv (36,876 rows).
+
+artifacts:
+  - harmonized_11trials.csv
+  - harmonized_9trials_gold.csv
+  - harmonized_9trials_reproduced.csv
+
+# Verified unique in all three artifacts (0 duplicated keys). Cimac.id is null
+# for the two trials that have no specimen identifier, and the key stays unique
+# because Collection_Event separates those rows.
+row_key: [trial, cimac_part_id, Cimac.id, Collection_Event]
+
+# The delivered column order, verified identical in all three artifacts. This is
+# a delivery contract: downstream consumers read these files positionally.
+column_order:
+  - cimac_part_id
+  - Cimac.id
+  - Collection_Event
+  - race
+  - sex
+  - age
+  - arm
+  - os_time
+  - os_stat
+  - pfs_time
+  - pfs_stat
+  - clinical_benefit
+  - treatment
+  - phase
+  - trial
+  - clinical_benefit.binary
+  - Collection_Event_alt
+  - pfs_bin
+  - bor_bin
+column_order_severity: error
+unexpected_column_severity: error
+
+# A CSV blank is the only null. Verified: no artifact contains a literal "NA",
+# "nan", "NULL" or similar token in any column.
+null_encoding: ""
+
+fields:
+
+  # ── identifiers and anchors ───────────────────────────────────────────────
+  - name: cimac_part_id
+    description: CIMAC participant identifier. The participant-level anchor.
+    role: identifier
+    type: string
+    required_column: true
+    nullable: false
+    pattern: "^[A-Za-z0-9]{7}$"
+    pattern_severity: warning
+    evidence: >-
+      Non-null in all 5,541 rows across the three artifacts. All 670 distinct
+      values are exactly 7 alphanumeric characters. Pattern severity is warning,
+      not error, because the identifier format is a source convention rather
+      than an approved contract, and config carries one placeholder
+      (14C0059G MISSING_0) that would not match — it is excluded and never
+      reaches an artifact, but a hard failure on ID shape would be a claim the
+      repository does not support.
+
+  - name: Cimac.id
+    description: >-
+      CIMAC specimen/sample identifier. Absent for trials whose source data
+      carries no specimen identifier.
+    role: identifier
+    type: string
+    required_column: true
+    nullable: true
+    pattern: "^[A-Za-z0-9]{9}(\\.[0-9]{2})?$"
+    pattern_severity: warning
+    value_states: [not_applicable]
+    evidence: >-
+      1,781 distinct values with observed lengths 9 and 12. Synthetic examples
+      of those two formats are SYNTH0001 and SYNTH0001.01. Null for all 196
+      10013 rows and all 22 14C0059G rows in the 11-trial artifact; provenance
+      records value_state=not_applicable for the 14C0059G rows (10013 emits no
+      cell).
+
+  - name: Collection_Event
+    description: Source-verbatim timepoint label for the specimen collection.
+    role: partition
+    type: string
+    required_column: true
+    nullable: false
+    vocabulary:
+      unknown_severity: info
+      values:
+        - Baseline
+        - C12D1
+        - C1D1
+        - C3D1
+        - C8D1
+        - Cycle2_Day1
+        - Cycle4_Day1
+        - Cycle_2_Day_1
+        - Cycle_2_Week_3
+        - Cycle_3
+        - Cycle_3_Day_1
+        - Cycle_4_Week_7
+        - Cycle_5_Week_9
+        - "DAY 42"
+        - "DAY 60"
+        - "DAY 90"
+        - Day_8
+        - Definitive Surgery
+        - End_of_Cycle_1
+        - End_of_Cycle_10
+        - End_of_Cycle_2
+        - End_of_Cycle_4
+        - End_of_Cycle_7
+        - End_of_Lead_In
+        - End_of_Treatment
+        - End_of_treatment
+        - Off_study
+        - On_Treatment
+        - Other
+        - Post Cycle 1
+        - Post Cycle 3
+        - Pre_D1_C2
+        - Progression
+        - Restaging
+        - SCREENING
+        - Week_11
+        - Week_3
+        - Week_5
+    evidence: >-
+      38 distinct values, non-null in every row of all three artifacts. These are
+      source labels preserved verbatim per trial, not a harmonized vocabulary —
+      the harmonized timepoint is Collection_Event_alt. unknown_severity is info
+      because a new trial legitimately introduces new labels. No canonical tier
+      is declared: `End_of_Treatment` and `End_of_treatment` differ only in case
+      and both ship, but which is canonical has not been decided (see C12/Q2), so
+      the schema records the pair without ruling on it.
+
+  # ── demographics ──────────────────────────────────────────────────────────
+  - name: race
+    description: Harmonized participant race.
+    role: category
+    type: string
+    required_column: true
+    nullable: true
+    vocabulary:
+      values:
+        - white
+        - black
+        - asian
+        - amerind
+        - unk
+        - Other
+        - Black
+        - WHITE
+        - BLACK OR AFRICAN AMERICAN
+        - AMERICAN INDIAN OR ALASKA NATIVE
+        - NOT REPORTED
+      canonical: [white, black, asian, amerind, unk]
+      unknown_severity: warning
+      non_canonical_severity: warning
+    value_states: [suppressed]
+    evidence: >-
+      11 distinct delivered values. The lowercase tokens are the harmonized
+      vocabulary produced by the per-trial value_maps in
+      harmonization_config.yaml and are therefore canonical. The six others are
+      delivered unnormalized: ABTC1603 ships WHITE / BLACK OR AFRICAN AMERICAN /
+      NOT REPORTED / AMERICAN INDIAN OR ALASKA NATIVE (no race value_map),
+      EAY131-Z1D ships `Black` (config comment: "template preserves capital B"),
+      and CIMAC-9204 ships `Other`. They are permitted because they are the
+      shipped values; flagging them as non-canonical at warning severity records
+      the normalization backlog without failing a delivery. 4 nulls in the
+      11-trial artifact carry value_state=suppressed (below-threshold values
+      withheld); 10 further nulls in the QC artifact are screen-failure rows.
+
+  - name: sex
+    description: Harmonized participant sex.
+    role: category
+    type: string
+    required_column: true
+    nullable: true
+    vocabulary:
+      values: [F, M, FEMALE GENDER, MALE GENDER]
+      canonical: [F, M]
+      unknown_severity: warning
+      non_canonical_severity: warning
+    evidence: >-
+      4 distinct values. F/M are the harmonized codes from the per-trial sex
+      value_maps. ABTC1603 ships MALE GENDER / FEMALE GENDER verbatim from its
+      source coding (145 rows) with no sex value_map configured; those are
+      permitted but non-canonical. Nullable because the 10 screen-failure ghost
+      rows retained in the QC artifact have no demographics.
+
+  - name: age
+    description: Participant age at enrollment.
+    role: measure
+    type: integer
+    unit: years
+    required_column: true
+    nullable: true
+    bounds: {min: 0, max: 120, severity: error}
+    value_states: [not_applicable]
+    evidence: >-
+      Integral in all 5,509 delivered values, observed range 19–88, no negatives.
+      The 0–120 bound is taken from the Phase 1 handoff §J.5, which names it as
+      the intended range check; it is deliberately wider than the observed range
+      so the check does not overfit to the current cohort. Null for all 22
+      14C0059G rows, where provenance records value_state=not_applicable: the
+      demographics source has no age column at all, which is not the same as an
+      unknown age.
+
+  # ── study assignment ──────────────────────────────────────────────────────
+  - name: arm
+    description: >-
+      Original randomized or assigned study arm, where the trial has an
+      authoritative arm variable.
+    role: category
+    type: string
+    required_column: true
+    nullable: true
+    open_questions:
+      - "rae_comments_disposition.csv#C4 (arm cleanup, implemented, pending review)"
+    evidence: >-
+      17 distinct values with no cross-trial vocabulary: per-trial arm labels
+      (ARM A1 / ARM B / Arm C for 10104, A–I for CIMAC-e4412, ARM A / ARM B for
+      10013) plus four 14C0059G dose-cohort strings such as
+      "1 x 10^5 transduced T cells/kg (+/-20%)". No controlled vocabulary is
+      declared because none exists: the values are legitimately trial-specific.
+      Null in 1,391 rows (7 trials) — a deliberate NA under RAE C4 where no
+      authoritative arm variable exists, not a missing value. C4 is implemented
+      and pending review, recorded here and not enforced.
+
+  - name: treatment
+    description: Harmonized study treatment or treatment course.
+    role: category
+    type: string
+    required_column: true
+    nullable: false
+    vocabulary:
+      unknown_severity: warning
+      values:
+        - AdvtK_Val_Nivo_TMZ
+        - BV+ipi
+        - BV+nivo
+        - BV+nivo+ipi
+        - D+T+HDRT
+        - D+T+LDRT
+        - D+T+NoRT
+        - NACT
+        - Nivolumab
+        - adoptive_cell_therapy
+        - atezo+NACT
+        - cabo_nivo
+        - gem+cis+nivo
+        - ipi
+        - ipi_dec
+        - nivo
+        - nivo+ipi
+        - nivo_then_cabo_nivo
+    open_questions:
+      - "clinical_team_review_questions.csv#Q5 (EAY131-Z1D nivolumab vs atezolizumab)"
+      - "rae_comments_disposition.csv#C8 (10104 treatment, implemented, pending review)"
+    evidence: >-
+      18 distinct values, non-null in every row of all three artifacts, produced
+      by treatment_per_arm maps and trial_constants in harmonization_config.yaml.
+      unknown_severity is warning, not error: a new trial adds a new regimen
+      label and that is expected growth, not corruption. No canonical tier — the
+      labels follow no single naming convention (`nivo` vs `Nivolumab`), and no
+      reviewer decision establishes one. Q5 concerns whether the EAY131-Z1D value
+      `Nivolumab` is the correct drug; it is recorded here and unenforced, and
+      the value is unchanged.
+
+  - name: phase
+    description: Trial phase.
+    role: category
+    type: string
+    required_column: true
+    nullable: true
+    vocabulary:
+      values: ["2", "3", "I", "II"]
+      unknown_severity: warning
+    value_states: [not_applicable]
+    open_questions:
+      - "rae_comments_disposition.csv#C5 (phase corrections, implemented, pending review)"
+    evidence: >-
+      4 distinct values. Arabic and Roman numerals are mixed across trials
+      (10013/CIMAC-10021/CIMAC-gu16257 = "2", CIMAC-s1400i = "3", ABTC1603 = "I",
+      EAY131_Z1D = "II"), each set by an individually recorded decision (RAE C5a
+      /b/c and per-trial trial_constants). No canonical tier is declared because
+      no decision establishes one representation as correct; unifying them would
+      change delivered values, which Phase 2a does not do. Null for 5 trials
+      whose phase is not recorded; 14C0059G carries
+      value_state=not_applicable.
+
+  - name: trial
+    description: Trial identifier. Partitions the harmonized table.
+    role: partition
+    type: string
+    required_column: true
+    nullable: false
+    vocabulary:
+      unknown_severity: error
+      values:
+        - "10013"
+        - "10026"
+        - "10104"
+        - 14C0059G
+        - ABTC1603
+        - CIMAC-10021
+        - CIMAC-9204
+        - CIMAC-e4412
+        - CIMAC-gu16257
+        - CIMAC-s1400i
+        - EAY131_Z1D
+    evidence: >-
+      Exactly the 11 registered trials, non-null in every row; the 9-trial
+      artifacts carry 9 of them. unknown_severity is error because the trial set
+      is closed for this schema version and a value outside it means a corrupted
+      or misjoined label. Onboarding a twelfth trial is a deliberate schema
+      change (minor version bump), which is the intended coupling.
+
+  # ── survival ──────────────────────────────────────────────────────────────
+  - name: os_time
+    description: >-
+      Overall survival time from the trial's survival anchor to death or last
+      follow-up.
+    role: measure
+    type: integer
+    unit: days
+    required_column: true
+    nullable: true
+    bounds: {min: 0, severity: error}
+    value_states: [provisional]
+    evidence: >-
+      Integral in all 5,095 delivered values, observed range 6–1470, no
+      negatives. A duration cannot be negative, and the source column names state
+      the unit ("time in days from ..."); CIMAC-s1400i source months are
+      converted at 30.4375 days/month by time_unit_conversion. No maximum is
+      declared: nothing in the repository establishes a maximum follow-up, and
+      the observed 1470 is a cohort fact rather than a contract. Null for 10013
+      and CIMAC-9204 (no survival data in source). The 22 14C0059G values carry
+      value_state=provisional — delivered interim values pending trial-team
+      delivery (RAE C11 / Q6).
+
+  - name: os_stat
+    description: Overall survival event indicator. 1 = death, 0 = censored.
+    role: measure
+    type: integer
+    required_column: true
+    nullable: true
+    bounds: {min: 0, max: 1, severity: error}
+    value_states: [provisional]
+    evidence: >-
+      Exactly two delivered values, 0 and 1. The bound is the coding stated by
+      the source column names and echoed in harmonization_config.yaml
+      ("overall survival outcome (1:event, 0:censored)"). Declared as bounded
+      integer rather than a string vocabulary because the field is numeric.
+
+  - name: pfs_time
+    description: >-
+      Progression-free survival time from the trial's survival anchor to
+      progression, death or last follow-up.
+    role: measure
+    type: integer
+    unit: days
+    required_column: true
+    nullable: true
+    bounds: {min: 0, severity: error}
+    value_states: [provisional]
+    open_questions: []
+    evidence: >-
+      Integral in all 5,099 delivered values, observed range 0–1470, no
+      negatives. Same unit evidence as os_time. Q3 (10104 crossover anchoring)
+      was resolved on 2026-08-07 in favour of the delivered values, so it is not
+      recorded here as an open question.
+
+  - name: pfs_stat
+    description: >-
+      Progression-free survival event indicator. 1 = progression or death,
+      0 = censored.
+    role: measure
+    type: integer
+    required_column: true
+    nullable: true
+    bounds: {min: 0, max: 1, severity: error}
+    value_states: [provisional]
+    evidence: >-
+      Exactly two delivered values, 0 and 1, with the same source coding evidence
+      as os_stat.
+
+  # ── response ──────────────────────────────────────────────────────────────
+  - name: clinical_benefit
+    description: >-
+      Best response or clinical-benefit determination, in the source trial's own
+      response vocabulary.
+    role: category
+    type: string
+    required_column: true
+    nullable: true
+    vocabulary:
+      unknown_severity: info
+      values:
+        - "-"
+        - CR
+        - CRi
+        - CRm
+        - Clin-Ben
+        - INC
+        - Morphological Complete Remission
+        - "N"
+        - NASS
+        - NE
+        - "No"
+        - No C-B
+        - Not Applicable
+        - PD
+        - PR
+        - Partial Remission
+        - Persistent Disease
+        - Progression
+        - Progressive Disease
+        - Progressive Disease or Relapsed Disease
+        - SD
+        - STA
+        - SYMP
+        - Stable Disease
+        - UE
+        - UPR
+        - "Y"
+        - "Yes"
+        - other
+    value_states: [transformed]
+    open_questions:
+      - "clinical_team_review_questions.csv#Q1 (ABTC1603 Not-Evaluable handling)"
+    evidence: >-
+      29 distinct values spanning several unrelated source vocabularies (RECIST
+      CR/PR/SD/PD, leukaemia CRm/CRi/NASS, yes-no Y/N, and the derived
+      Clin-Ben / No C-B pair). This is deliberately NOT a controlled vocabulary:
+      no cross-trial harmonization of response categories has been decided, and
+      declaring one would assert a mapping nobody approved. The value list is
+      descriptive, so unknown_severity is info — a previously unseen response
+      code is worth reporting, not failing. The binary reduction is
+      clinical_benefit.binary. 145 rows carry value_state=transformed, the
+      ABTC1603 gold-only 120-day PFS landmark rule.
+
+  - name: clinical_benefit.binary
+    description: Binary clinical-benefit classification derived from the response.
+    role: derived
+    type: string
+    required_column: true
+    nullable: true
+    vocabulary:
+      values: [R, NR, SD, other]
+      unknown_severity: error
+    value_states: [transformed]
+    evidence: >-
+      Exactly four delivered values. This IS a controlled vocabulary: it is the
+      input contract of derive_bor_bin in scripts/lib/normalize.py, which
+      branches on R, NR and SD and maps everything else to NaN by design.
+      unknown_severity is error because a fifth value would silently produce a
+      null bor_bin rather than a classification.
+
+  - name: Collection_Event_alt
+    description: Harmonized standardized timepoint label.
+    role: category
+    type: string
+    required_column: true
+    nullable: true
+    vocabulary:
+      values: [Baseline, C2, C3, C4, C5, C8, C12, EOT, first_sample_post_treatment]
+      unknown_severity: warning
+    value_states: [source_missing]
+    open_questions:
+      - "clinical_team_review_questions.csv#Q2 (22 unconfirmed timepoint mappings)"
+      - "clinical_team_review_questions.csv#Q8 (10013 and 14C0059G unmapped)"
+    evidence: >-
+      9 distinct values, exactly the range of the collection_event_alt_map
+      entries in harmonization_config.yaml. Null for all 196 10013 rows and all
+      22 14C0059G rows, which have no map yet (Q8); the 14C0059G rows carry
+      value_state=source_missing. Q2 concerns whether 22 of the 44 existing
+      mappings are correct, including 3 recorded as contradicted and 1 as
+      ambiguous that still ship — all recorded here and unenforced, with no
+      value changed.
+
+  # ── derived binaries ──────────────────────────────────────────────────────
+  - name: pfs_bin
+    description: >-
+      Progression-free-survival binary at the 120-day landmark. 1 = PFS at or
+      beyond the landmark.
+    role: derived
+    type: integer
+    required_column: true
+    nullable: true
+    bounds: {min: 0, max: 1, severity: error}
+    evidence: >-
+      Exactly two delivered values, 0 and 1. Produced by derive_pfs_bin in
+      scripts/lib/normalize.py, which returns 1, 0 or None only. Null where the
+      rule cannot classify — notably censored before the landmark, which the rule
+      intentionally leaves unclassified.
+
+  - name: bor_bin
+    description: >-
+      Best-overall-response binary, derived from clinical_benefit.binary with a
+      120-day landmark for stable disease.
+    role: derived
+    type: integer
+    required_column: true
+    nullable: true
+    bounds: {min: 0, max: 1, severity: error}
+    evidence: >-
+      Exactly two delivered values, 0 and 1. Produced by derive_bor_bin in
+      scripts/lib/normalize.py, which returns 1, 0 or None only.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cross-field constraints.
+#
+# Only relationships an implemented rule or a reviewed document already asserts.
+# Plausible clinical relationships that nothing in the repository establishes are
+# deliberately absent — see the implementation report for the list considered and
+# rejected.
+# ─────────────────────────────────────────────────────────────────────────────
+constraints:
+
+  - id: pfs_bin_requires_pfs_time
+    kind: requires_non_null
+    field: pfs_bin
+    other: pfs_time
+    severity: error
+    description: pfs_bin cannot be classified without pfs_time.
+    evidence: >-
+      derive_pfs_bin (scripts/lib/normalize.py) returns None whenever pfs_time is
+      not numeric, so a non-null pfs_bin beside a null pfs_time would mean the
+      value did not come from the implemented rule. 0 violations in all three
+      artifacts.
+
+  - id: bor_bin_requires_clinical_benefit_binary
+    kind: requires_non_null
+    field: bor_bin
+    other: clinical_benefit.binary
+    severity: error
+    description: bor_bin is derived from clinical_benefit.binary.
+    evidence: >-
+      derive_bor_bin (scripts/lib/normalize.py) returns None whenever
+      clinical_benefit.binary is NaN. 0 violations in all three artifacts.
+
+  - id: pfs_time_not_after_os_time
+    kind: less_or_equal
+    field: pfs_time
+    other: os_time
+    severity: warning
+    description: >-
+      Progression-free survival time exceeding overall survival time for the same
+      participant, reported as a data-quality signal.
+    evidence: >-
+      WARNING, not error, and deliberately so. No implemented rule or reviewer
+      decision in this repository asserts pfs_time <= os_time, so declaring it an
+      invariant would be inventing a clinical relationship — which Phase 2a does
+      not do. It is included at warning severity because it currently fires on 3
+      rows. Those conditions are faithfully carried from their sources, so they
+      remain data-quality questions for the respective trial teams rather than
+      harmonization defects. No value is changed.

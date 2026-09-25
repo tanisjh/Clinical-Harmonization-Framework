@@ -1,0 +1,189 @@
+spec_id: synthetic/device_stage6_constant
+spec_version: 1.0.0
+project: synthetic_replay
+trial: synthetic_device_lab
+target_schema: {id: synthetic/device_stage6, version: 1.0.0}
+status: approved
+description: Source-independent scalar constant replay fixture.
+sources:
+  - id: unused_readings
+    path: tests/fixtures/synthetic_replay/sources/stage5_readings.csv
+    file_type: csv
+    reader: cidc_csv@v1
+    logical_label: unused_stage6_readings.csv
+    record_keys: [device_id, reading_id]
+    participant_column: device_id
+reads:
+  - id: observed_location
+    source: unused_readings
+    column: location
+conditions:
+  - id: observed_record
+    read: observed_location
+    predicate: is_null
+record:
+  anchor: external
+  participant_key: device_id
+  sample_key: reading_id
+  collection_event_key: location
+  duplicates: {policy: error, by: [device_id, reading_id]}
+mappings:
+  - mapping_id: constant.string
+    target: constant_string
+    op: constant
+    value: alpha
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: 0.91
+    provenance:
+      source_label: CONFIG:synthetic_constants
+      record_key_from: participant
+
+  - mapping_id: constant.integer
+    target: constant_integer
+    op: constant
+    value: 7
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: 0.92
+
+  - mapping_id: constant.float
+    target: constant_float
+    op: constant
+    value: 2.5
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: 0.93
+
+  - mapping_id: constant.boolean
+    target: constant_boolean
+    op: constant
+    value: true
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: 0.94
+
+  - mapping_id: constant.null
+    target: constant_null
+    op: constant
+    value: null
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    no_value_rule: {id: constant.null.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.21}
+
+  - mapping_id: constant.null_default_rule
+    target: constant_null_default_rule
+    op: constant
+    value: null
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.22}
+
+  - mapping_id: constant.transformed
+    target: constant_transformed
+    op: constant
+    value: transformed-value
+    value_state: transformed
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: 0.95
+
+  - mapping_id: constant.delivered
+    target: constant_delivered
+    op: constant
+    value: delivered-value
+    value_state: delivered
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: 0.95
+
+  - mapping_id: constant.state_none
+    target: constant_state_none
+    op: constant
+    value: state-omitted
+    value_state: transformed
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: 0.95
+    provenance: {value_state: none}
+
+  - mapping_id: constant.raw_none
+    target: constant_raw_none
+    op: constant
+    value: no-snapshot
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: 0.96
+    provenance:
+      source_label: CONFIG:legacy_constant
+      raw_value: none
+
+  - mapping_id: constant.parent
+    target: constant_parent
+    op: constant
+    value: other
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: 0.95
+
+  - mapping_id: constant.derived
+    target: constant_derived
+    op: constant
+    value: derived-context
+    rule: {id: constant.derived.v1, version: 1, review_status: approved}
+    confidence: 0.95
+    derivation:
+      - record:
+          kind: synthetic_constant_context
+          rule_id: constant.derived.v1
+          final_value: {$ref: value}
+
+  - mapping_id: custom.downstream_blocked
+    target: downstream_blocked
+    op: custom_rule
+    inputs: [constant_parent, constant_derived]
+    output_type: string
+    params: {}
+    rule: {id: synthetic.constant_pair.v1, version: 1, review_status: approved}
+    confidence: from_rule
+
+  - mapping_id: constant.conditional
+    target: constant_conditional
+    op: constant
+    when: observed_record
+    value: conditional-value
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: 0.9
+
+  - mapping_id: constant.anchor
+    target: constant_anchor
+    op: constant
+    source: $anchor
+    column: location
+    value: anchor-context
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: 0.9
+
+  - mapping_id: absence.not_applicable
+    target: absent_declared
+    op: not_applicable
+    source: $anchor
+    column: location
+    value_state: not_applicable
+    rule: {id: absence.not_applicable.v1, version: 1, review_status: approved}
+    confidence: 0.8
+
+  - mapping_id: absence.no_mapping
+    target: no_mapping_value
+    op: no_mapping_configured
+    source: $anchor
+    column: location
+    rule: {id: absence.no_mapping.v1, version: 1, review_status: approved}
+    confidence: 0.3
+
+  - mapping_id: constant.collection
+    target: constant_collection
+    op: constant
+    value: [alpha, beta]
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    confidence: 0.9
+    provenance: {raw_value: none}
+
+  - mapping_id: constant.nonfinite
+    target: constant_nonfinite
+    op: constant
+    value: .nan
+    rule: {id: constant.scalar.v1, version: 1, review_status: approved}
+    no_value_rule: {id: constant.null.v1, version: 1, review_status: approved}
+    confidence: {value: 0.9, no_value: 0.2}
+    provenance: {raw_value: none}

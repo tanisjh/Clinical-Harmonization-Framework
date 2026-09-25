@@ -1,0 +1,23 @@
+schema_id: synthetic/device_stage10
+schema_version: 1.0.0
+title: Synthetic grouping-anchor direct replay
+row_key: [cimac_part_id, Cimac.id, Collection_Event]
+column_order:
+  - cimac_part_id
+  - Cimac.id
+  - Collection_Event
+  - direct_none
+  - direct_text
+  - direct_numeric
+  - direct_unattributed
+  - anchor_map_unsupported
+fields:
+  - {name: cimac_part_id, type: string, nullable: false}
+  - {name: Cimac.id, type: string, nullable: false}
+  - {name: Collection_Event, type: string, nullable: false}
+  - {name: direct_none, type: string, nullable: true}
+  - {name: direct_text, type: string, nullable: true}
+  - {name: direct_numeric, type: number, nullable: true}
+  - {name: direct_unattributed, type: string, nullable: true}
+  - {name: anchor_map_unsupported, type: string, nullable: true}
+null_encoding: ""

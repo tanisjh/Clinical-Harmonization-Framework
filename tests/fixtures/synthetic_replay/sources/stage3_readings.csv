@@ -1,0 +1,2 @@
+device_id,reading_id,location,base_measurement,calibration_offset
+DEVICE-A,READ-001,bench-west,10,3

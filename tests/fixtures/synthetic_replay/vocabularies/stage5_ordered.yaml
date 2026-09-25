@@ -1,0 +1,45 @@
+vocabulary_id: synthetic/stage5_ordered
+version: 1.0.0
+kind: ordered_rules
+description: Synthetic ordered rules exercising every supported match mode.
+evidence: Non-clinical Stage 5 replay fixture.
+terms:
+  - match: sensor
+    kind: contains
+    value: broad-first
+    confidence: 0.71
+    rule: {id: vocab.contains.v1, version: '1'}
+  - match: sensor alpha
+    kind: contains
+    value: narrow-second
+    confidence: 0.72
+    rule: {id: vocab.contains.v1, version: '1'}
+  - match: EXACT
+    kind: exact
+    value: exact-hit
+    confidence: 0.81
+    rule: {id: vocab.exact.v1, version: '1'}
+  - match: Case
+    kind: iexact
+    value: iexact-hit
+    confidence: 0.82
+    rule: {id: vocab.iexact.v1, version: '1'}
+  - match: pre-
+    kind: prefix
+    value: prefix-hit
+    confidence: 0.83
+    rule: {id: vocab.prefix.v1, version: '1'}
+  - match: middle
+    kind: contains
+    value: contains-hit
+    confidence: 0.84
+    rule: {id: vocab.contains.v1, version: '1'}
+  - match: '^R[0-9]+$'
+    kind: regex
+    value: regex-hit
+    confidence: 0.85
+    rule: {id: vocab.regex.v1, version: '1'}
+  - match: KEEP
+    kind: exact
+    confidence: 0.86
+    rule: {id: vocab.passthrough.v1, version: '1'}

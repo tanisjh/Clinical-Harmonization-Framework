@@ -1,0 +1,14 @@
+schema_id: synthetic/device_readings
+schema_version: 1.0.0
+title: Synthetic calibrated device readings
+row_key: [device_id, reading_id]
+column_order: [device_id, reading_id, location, reading_text, sequence_number, enabled, optional_note]
+null_encoding: ""
+fields:
+  - {name: device_id, type: string, nullable: false}
+  - {name: reading_id, type: string, nullable: false}
+  - {name: location, type: string, nullable: false}
+  - {name: reading_text, type: string, nullable: true}
+  - {name: sequence_number, type: integer, nullable: false}
+  - {name: enabled, type: string, nullable: false}
+  - {name: optional_note, type: string, nullable: true}
