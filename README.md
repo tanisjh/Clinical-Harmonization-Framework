@@ -80,6 +80,7 @@ as independent clinical validation of an AI- or human-authored mapping.
 ```text
 scripts/      harmonization, validation, provenance, tracing, and replay tools
 scripts/lib/  shared execution, evidence, schema, and replay modules
+profiles/     mutable project-tooling settings loaded only when requested
 schemas/      machine-readable target data contract
 tests/        portable synthetic tests and source-free acceptance checks
 ```
@@ -91,6 +92,35 @@ and generated production artifacts are not bundled with this repository.
 The checkout contains the engine, a current target schema, and synthetic test
 fixtures. A real harmonization run also requires a reviewed project
 specification and its separately managed source files.
+
+## Project profiles
+
+A `ProjectProfile` is a small, strict settings document for current tooling. It
+may name the authoritative target schema, explicitly approved specification
+files or non-recursive specification roots, current configuration references,
+output defaults, and roles or aliases for artifact IDs already declared by the
+target schema. Unknown fields, non-portable references, ambiguous aliases, and
+references inconsistent with the schema or specifications fail validation.
+
+The profile does not contain target fields, mappings, clinical values,
+normalization rules, scientific logic, or replay evidence. The target schema
+defines output structure; mapping specifications and registered rules define
+harmonization behavior; pinned manifests and evidence define historical replay
+authority. Strict replay never consults today's mutable profile to reinterpret
+a historical event.
+
+The public-safe current profile is
+`profiles/clinical_harmonization.yaml`. Validate it without running
+harmonization or replay:
+
+```bash
+./.venv/bin/python scripts/validate_project_profile.py \
+  profiles/clinical_harmonization.yaml
+```
+
+Existing commands do not load this profile. A later tooling-adoption step may
+use its defaults under the documented precedence rule: an explicit CLI argument
+wins over a ProjectProfile default.
 
 ## Installation
 

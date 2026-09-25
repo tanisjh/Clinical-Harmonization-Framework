@@ -1,0 +1,21 @@
+# Mutable defaults for current project tooling. This profile is not historical
+# replay authority and is loaded only when a caller explicitly requests it.
+profile_id: clinical-harmonization-framework
+profile_format_version: 1
+profile_version: 1.0.0
+target_schema: schemas/cimac_clinical_v1.yaml
+
+tooling:
+  output_directory: harmonization_outputs
+  provenance_filename: provenance_long.csv
+
+# Values are existing artifact IDs from the target schema, not new definitions.
+artifacts:
+  roles:
+    primary_delivery: harmonized_11trials.csv
+    gold_delivery: harmonized_9trials_gold.csv
+    template_reproduction_qc: harmonized_9trials_reproduced.csv
+  aliases:
+    harmonized_11trials: harmonized_11trials.csv
+    harmonized_9trials_gold: harmonized_9trials_gold.csv
+    harmonized_9trials_reproduced: harmonized_9trials_reproduced.csv
