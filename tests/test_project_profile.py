@@ -316,14 +316,27 @@ def test_loading_profile_does_not_mutate_runtime_module_state(tmp_path):
 
 def test_existing_execution_and_replay_modules_do_not_import_project_profile():
     runtime_files = [
-        REPOSITORY_ROOT / "scripts/harmonize_spec.py",
         REPOSITORY_ROOT / "scripts/lib/spec_executor.py",
+        REPOSITORY_ROOT / "scripts/lib/canonical.py",
         REPOSITORY_ROOT / "scripts/lib/replay.py",
+        REPOSITORY_ROOT / "scripts/lib/replay_contract.py",
         REPOSITORY_ROOT / "scripts/lib/replay_manifest.py",
+        REPOSITORY_ROOT / "scripts/lib/replay_orchestration.py",
         REPOSITORY_ROOT / "scripts/lib/source_ref.py",
+        REPOSITORY_ROOT / "scripts/lib/anchor_evidence.py",
+        REPOSITORY_ROOT / "scripts/lib/provenance.py",
+        REPOSITORY_ROOT / "scripts/lib/contributions.py",
+        REPOSITORY_ROOT / "scripts/lib/cidc_io.py",
+        REPOSITORY_ROOT / "scripts/lib/xlsx_reader.py",
+        REPOSITORY_ROOT / "scripts/lib/trace_io.py",
+        REPOSITORY_ROOT / "scripts/lib/confidence_policy.py",
     ]
+    # Explicit CLI configuration is tested at its boundary; core authority is
+    # independent of both the mutable profile and its tooling-choice helper.
     for path in runtime_files:
-        assert "project_profile" not in path.read_text(encoding="utf-8"), path
+        source = path.read_text(encoding="utf-8")
+        assert "project_profile" not in source, path
+        assert "tooling_defaults" not in source, path
 
 
 def test_read_only_validation_cli_reports_identity(tmp_path, capsys):

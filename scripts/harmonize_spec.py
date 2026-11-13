@@ -49,6 +49,10 @@ import yaml                                            # noqa: E402
 
 from lib import canonical, spec_preflight              # noqa: E402
 from lib.anchor_evidence import load_external_anchor   # noqa: E402
+from lib.project_profile import (                     # noqa: E402
+    ProjectProfileError,
+    load as load_project_profile,
+)
 from lib.replay_orchestration import (                 # noqa: E402
     ReplayEvidenceCollector,
     ReplayOrchestrationError,
@@ -58,6 +62,7 @@ from lib.replay_orchestration import (                 # noqa: E402
 )
 from lib.schema_model import load as load_schema       # noqa: E402
 from lib.spec_model import SpecError, load as load_spec  # noqa: E402
+from lib.tooling_defaults import resolve_tool_default  # noqa: E402
 
 EXIT_OK = 0
 EXIT_RUN_FAILED = 1
@@ -128,7 +133,13 @@ def main(argv=None) -> int:
     p.add_argument("spec", help="path to an approved specification YAML")
     p.add_argument("--output", required=True, help="canonical CSV to write")
     p.add_argument("--provenance", help="optional Cell-stream CSV to write")
-    p.add_argument("--schema", default=DEFAULT_SCHEMA)
+    p.add_argument(
+        "--project-profile",
+        help="explicit ProjectProfile for the schema default; never auto-discovered",
+    )
+    p.add_argument("--schema", default=None,
+                   help=("target schema YAML (overrides ProjectProfile; "
+                         f"default without profile: {DEFAULT_SCHEMA})"))
     p.add_argument("--anchor", default=DEFAULT_ANCHOR,
                    help="row-anchor table (external-anchor specs only)")
     p.add_argument("--config", default=DEFAULT_CONFIG,
@@ -154,8 +165,19 @@ def main(argv=None) -> int:
         print("ERROR  --replay-run-dir requires --provenance", file=sys.stderr)
         return EXIT_USAGE
 
+    profile_schema = ""
+    if args.project_profile is not None:
+        try:
+            profile = load_project_profile(
+                args.project_profile, project_root=PROJECT_ROOT)
+            profile_schema = str(profile.resolve(profile.target_schema))
+        except ProjectProfileError as exc:
+            print(f"PROFILE ERROR: {exc}", file=sys.stderr)
+            return EXIT_USAGE
+
+    schema_path = resolve_tool_default(args.schema, profile_schema, DEFAULT_SCHEMA)
     try:
-        schema = load_schema(PROJECT_ROOT / args.schema)
+        schema = load_schema(PROJECT_ROOT / schema_path)
     except Exception as e:
         print(f"ERROR  could not load target schema: {e}", file=sys.stderr)
         return EXIT_SCHEMA_LOAD

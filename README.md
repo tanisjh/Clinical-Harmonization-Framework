@@ -120,8 +120,8 @@ harmonization or replay:
 
 Profile adoption has begun only for explicitly supported tooling:
 `validate_harmonized_schema.py` accepts `--project-profile PATH` for current
-validation defaults, and `validate_spec.py` accepts it for the target-schema
-default only. There is no automatic or global profile discovery.
+validation defaults; `validate_spec.py` and `harmonize_spec.py` accept it for
+the target-schema default only. There is no automatic or global profile discovery.
 Explicit CLI arguments override profile defaults independently; omitted values
 retain the command's existing defaults or requirements when no profile is
 supplied. Broader command adoption remains separately scoped future work.
@@ -191,6 +191,15 @@ enabled by default and is disabled only by `--no-source-check`.
 Strict replay publication additionally requires an explicit run directory,
 run identity, provenance output, and artifact identity; see
 `scripts/harmonize_spec.py --help` for the supported options.
+
+For `harmonize_spec.py`, an explicit `--project-profile PATH` supplies only the
+target-schema location when `--schema` is omitted. Explicit `--schema` wins;
+the specification path remains required. The full strict profile loader may
+validate other declared references, but anchor/config inputs, output/provenance
+destinations and replay/identity controls keep their existing CLI behavior.
+They are not profile-defaulted. The loaded schema and pinned evidence remain
+authoritative; the current profile is not historical replay authority. Broader
+execution-input adoption remains separately scoped future work.
 
 ### Validate a harmonized table
 
