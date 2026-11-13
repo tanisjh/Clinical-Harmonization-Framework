@@ -120,12 +120,13 @@ harmonization or replay:
 
 Profile adoption has begun only for explicitly supported tooling:
 `validate_harmonized_schema.py` accepts `--project-profile PATH` for current
-validation defaults. There is no automatic or global profile discovery.
+validation defaults, and `validate_spec.py` accepts it for the target-schema
+default only. There is no automatic or global profile discovery.
 Explicit CLI arguments override profile defaults independently; omitted values
 retain the command's existing defaults or requirements when no profile is
 supplied. Broader command adoption remains separately scoped future work.
 Harmonization semantics and historical replay authority remain independent of
-ProjectProfile.
+ProjectProfile. A profile does not establish specification approval.
 
 ## Installation
 
@@ -161,6 +162,20 @@ files:
 Omit `--no-source-check` when the explicitly configured source files are
 available and should also be validated. Use `--schema` to select a target schema
 other than `schemas/cimac_clinical_v1.yaml`.
+
+An explicitly supplied profile can provide only the target-schema default for
+this command; explicit `--schema` wins:
+
+```bash
+./.venv/bin/python scripts/validate_spec.py \
+  --project-profile profiles/clinical_harmonization.yaml \
+  --no-source-check path/to/approved-spec.yaml
+```
+
+Specification paths remain required and explicit; profile-listed specs are not
+selected as command inputs. A supplied profile still undergoes full strict,
+source-free validation of its declared references. Source checking remains
+enabled by default and is disabled only by `--no-source-check`.
 
 ### Execute a reviewed specification
 

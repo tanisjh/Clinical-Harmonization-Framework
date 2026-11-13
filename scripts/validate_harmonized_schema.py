@@ -51,6 +51,7 @@ from lib.project_profile import (  # noqa: E402
 )
 from lib.schema_model import ERROR, SchemaError, load as load_schema  # noqa: E402
 from lib.source_ref import sha256_file  # noqa: E402
+from lib.tooling_defaults import resolve_tool_default as _configured  # noqa: E402
 
 EXIT_OK = 0
 EXIT_CONTENT_ERRORS = 1
@@ -65,14 +66,6 @@ STRUCTURAL_PREFIX = "structure."
 def _has_structural_errors(result: sv.ValidationResult) -> bool:
     return any(f.severity == ERROR and f.rule.startswith(STRUCTURAL_PREFIX)
                for f in result.findings)
-
-
-def _configured(explicit: str | None, profile_default: str,
-                existing_default: str) -> str:
-    """Apply CLI > explicit profile > existing behavior precedence."""
-    if explicit is not None:
-        return explicit
-    return profile_default or existing_default
 
 
 def _profile_reference(profile: ProjectProfile | None, reference: str) -> str:

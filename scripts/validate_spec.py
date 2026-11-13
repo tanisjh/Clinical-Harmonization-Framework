@@ -51,8 +51,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from lib import spec_preflight                       # noqa: E402
+from lib.project_profile import (                   # noqa: E402
+    ProjectProfileError,
+    load as load_project_profile,
+)
 from lib.schema_model import load as load_schema     # noqa: E402
 from lib.spec_model import SpecError, load as load_spec  # noqa: E402
+from lib.tooling_defaults import resolve_tool_default  # noqa: E402
 
 EXIT_OK = 0
 EXIT_FINDINGS = 1
@@ -110,8 +115,13 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(
         description="Deterministic pre-flight for a harmonization specification.")
     p.add_argument("spec", nargs="+", help="path to a specification YAML")
-    p.add_argument("--schema", default=DEFAULT_SCHEMA,
-                   help=f"target schema YAML (default: {DEFAULT_SCHEMA})")
+    p.add_argument(
+        "--project-profile",
+        help="explicit ProjectProfile for the schema default; never auto-discovered",
+    )
+    p.add_argument("--schema", default=None,
+                   help=("target schema YAML (overrides ProjectProfile; "
+                         f"default without profile: {DEFAULT_SCHEMA})"))
     p.add_argument("--no-source-check", action="store_true",
                    help="skip file and column checks (grammar and registry only)")
     p.add_argument("--json", action="store_true", help="machine-readable output")
@@ -119,10 +129,21 @@ def main(argv=None) -> int:
                    help="one line per spec; omit the structural summary")
     args = p.parse_args(argv)
 
+    profile_schema = ""
+    if args.project_profile is not None:
+        try:
+            profile = load_project_profile(
+                args.project_profile, project_root=PROJECT_ROOT)
+            profile_schema = str(profile.resolve(profile.target_schema))
+        except ProjectProfileError as exc:
+            print(f"PROFILE ERROR: {exc}", file=sys.stderr)
+            return EXIT_USAGE
+
+    schema_path = resolve_tool_default(args.schema, profile_schema, DEFAULT_SCHEMA)
     try:
-        schema = load_schema(PROJECT_ROOT / args.schema)
+        schema = load_schema(PROJECT_ROOT / schema_path)
     except Exception as e:
-        print(f"ERROR  could not load target schema {args.schema}: {e}",
+        print(f"ERROR  could not load target schema {schema_path}: {e}",
               file=sys.stderr)
         return EXIT_SCHEMA_LOAD
 
