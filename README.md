@@ -118,9 +118,14 @@ harmonization or replay:
   profiles/clinical_harmonization.yaml
 ```
 
-Existing commands do not load this profile. A later tooling-adoption step may
-use its defaults under the documented precedence rule: an explicit CLI argument
-wins over a ProjectProfile default.
+Profile adoption has begun only for explicitly supported tooling:
+`validate_harmonized_schema.py` accepts `--project-profile PATH` for current
+validation defaults. There is no automatic or global profile discovery.
+Explicit CLI arguments override profile defaults independently; omitted values
+retain the command's existing defaults or requirements when no profile is
+supplied. Broader command adoption remains separately scoped future work.
+Harmonization semantics and historical replay authority remain independent of
+ProjectProfile.
 
 ## Installation
 
@@ -179,6 +184,26 @@ run identity, provenance output, and artifact identity; see
   --schema path/to/target-schema.yaml \
   --artifact path/to/harmonized.csv
 ```
+
+This read-only validator is the first tool to support explicit profile-backed
+defaults. Supplying `--project-profile` may provide the target schema, output
+directory, provenance filename, and report filename when the corresponding CLI
+argument is omitted:
+
+```bash
+./.venv/bin/python scripts/validate_harmonized_schema.py \
+  --project-profile profiles/clinical_harmonization.yaml \
+  --all
+```
+
+Explicit CLI values always override profile defaults. Without
+`--project-profile`, behavior is unchanged; the command never discovers or
+loads a profile automatically.
+Profile provenance and report filenames resolve beneath the selected output
+directory, including an explicit `--outputs-dir` override. Use `--provenance ''`
+or `--out ''` to disable the corresponding profile default. `--all` always uses
+the artifact IDs declared by the target schema; profile roles and aliases do
+not select artifacts in this slice.
 
 ### Inspect recorded provenance
 
