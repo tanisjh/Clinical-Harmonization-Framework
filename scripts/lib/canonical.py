@@ -150,7 +150,7 @@ def _pivot():
     is the same operation whichever path assembles the table; duplicating it
     would be a second definition of what the harmonization decides.
     """
-    from extract_harmonized_clinical import pivot_cells_to_wide
+    from lib.pivot import pivot_cells_to_wide
     return pivot_cells_to_wide
 
 

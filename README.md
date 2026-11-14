@@ -93,6 +93,10 @@ The checkout contains the engine, a current target schema, and synthetic test
 fixtures. A real harmonization run also requires a reviewed project
 specification and its separately managed source files.
 
+Canonical execution uses the shared `scripts/lib/pivot.py` and does not require
+the historical project orchestrator. Its identity handling retains the existing
+Cell-v1 compatibility shape.
+
 ## Project profiles
 
 A `ProjectProfile` is a small, strict settings document for current tooling. It
