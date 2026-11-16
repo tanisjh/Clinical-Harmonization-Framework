@@ -12,13 +12,11 @@ The base class provides:
 """
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Iterator
 
 import pandas as pd
 
-from .cidc_io import read_cidc_csv
 from .normalize import (
     derive_bor_binary,
     derive_bor_bin,
@@ -28,9 +26,9 @@ from .normalize import (
 from .provenance import Cell
 from .replay_contract import encode_typed_raw
 from .source_ref import SourceRef, assert_within_roots
-from .xlsx_reader import XLSX_READER_ID, TrustedXlsxObservation, load_xlsx_source
+from .source_session import SourceSession
+from .xlsx_reader import TrustedXlsxObservation
 
-LOG = logging.getLogger("extractor")
 _RAW_VALUE_ABSENT = object()
 
 
@@ -51,7 +49,9 @@ class BaseExtractor:
             value_norms:  the global `value_normalizations` block
             derived_rules: the global `derived_rules` block (landmark parameters)
         """
-        self.project_root = Path(project_root)
+        self._source_session = SourceSession(
+            project_root, resolve_source=lambda key: self.src_path(key),
+            context_name=lambda: self.trial_dir_name)
         self.trial_dir = self.project_root / self.trial_dir_name
         self.anchor = anchor_df.reset_index(drop=True)
         self.cfg = trial_config or {}
@@ -59,13 +59,6 @@ class BaseExtractor:
         self.derived_rules = derived_rules or {}
         self.run_id = run_id
         self.spec_ref = spec_ref
-        # Cache of loaded source frames keyed by (filename or filename::sheet)
-        self._cache: dict[str, pd.DataFrame] = {}
-        self._xlsx_observations: dict[str, TrustedXlsxObservation] = {}
-        # SourceRef per logical config key, populated by load_csv/load_xlsx.
-        # Phase 1a: provenance source identity comes from HERE, never from a
-        # hand-typed string in an extractor. See lib/source_ref.py.
-        self._refs: dict[str, SourceRef] = {}
         # Counts cell() calls that still pass a bare string instead of a
         # SourceRef. Must reach 0 as extractors are migrated (plan §7 A6).
         self._legacy_label_uses: int = 0
@@ -102,91 +95,54 @@ class BaseExtractor:
                            legacy basename here so `column_map` keys and
                            historical provenance values stay unchanged.
         """
-        path = self.src_path(key)
-        ck = str(path)
-        if ck not in self._cache:
-            r = read_cidc_csv(path)
-            if r.note:
-                LOG.warning("CSV read note for %s: %s", path.name, r.note)
-            self._cache[ck] = r.df
-            self._refs[key] = SourceRef.build(
-                config_key=key,
-                path=path,
-                project_root=self.project_root,
-                file_type="csv",
-                reader_id="cidc_csv@v1",
-                logical_label=logical_label,
-                reader_flags=f"preamble_skipped={r.preamble_skipped};encoding={r.encoding}",
-                reader_effective_flags={
-                    "encoding": r.encoding,
-                    "header": 0,
-                    "low_memory": False,
-                    "skiprows": 1 if r.preamble_skipped else 0,
-                },
-                n_rows=len(r.df),
-            )
-        elif key not in self._refs and logical_label:
-            # Same physical file reached under a second logical key. Reuse the
-            # effective parser contract from the read that populated the cache.
-            relative = str(path.relative_to(self.project_root.resolve()))
-            prior = next(ref for ref in self._refs.values()
-                         if ref.resolved_path == relative)
-            self._refs[key] = SourceRef.build(
-                config_key=key, path=path, project_root=self.project_root,
-                file_type="csv", reader_id=prior.reader_id,
-                logical_label=logical_label, reader_flags=prior.reader_flags,
-                reader_effective_flags=dict(prior.reader_effective_flags),
-                n_rows=len(self._cache[ck]),
-            )
-        return self._cache[ck]
+        return self._source_session.load_csv(key, logical_label)
 
     def load_xlsx(self, key: str, sheet: str | int | None = None,
                   logical_label: str | None = None, *,
                   reader_id: str = "excel@v1") -> pd.DataFrame:
-        path = self.src_path(key)
-        if reader_id == XLSX_READER_ID:
-            if not isinstance(sheet, str) or not sheet:
-                raise ValueError(
-                    "xlsx_openpyxl@v1 requires a non-empty exact sheet name")
-            observation = self._xlsx_observations.get(key)
-            if observation is None:
-                observation = load_xlsx_source(
-                    path, project_root=self.project_root, config_key=key,
-                    sheet_name=sheet, logical_label=logical_label)
-                self._xlsx_observations[key] = observation
-                self._refs[key] = observation.source_ref
-            elif observation.source_ref.sheet != sheet:
-                raise ValueError(
-                    f"source {key!r} was already observed at sheet "
-                    f"{observation.source_ref.sheet!r}, not {sheet!r}")
-            return observation.frame_copy()
-        ck = f"{path}::{sheet}"
-        if ck not in self._cache:
-            self._cache[ck] = pd.read_excel(path, sheet_name=sheet) if sheet is not None else pd.read_excel(path)
-            self._refs[key] = SourceRef.build(
-                config_key=key,
-                path=path,
-                project_root=self.project_root,
-                file_type="xlsx",
-                reader_id="excel@v1",
-                logical_label=logical_label,
-                sheet=str(sheet) if sheet is not None else None,
-                n_rows=len(self._cache[ck]),
-            )
-        return self._cache[ck]
+        return self._source_session.load_xlsx(
+            key, sheet, logical_label, reader_id=reader_id)
 
     def ref(self, key: str) -> SourceRef:
         """SourceRef for a previously loaded logical input."""
-        if key not in self._refs:
-            raise KeyError(
-                f"No SourceRef for '{key}' in {self.trial_dir_name}; "
-                "call load_csv()/load_xlsx() first"
-            )
-        return self._refs[key]
+        return self._source_session.ref(key)
 
     def source_refs(self) -> dict[str, SourceRef]:
         """All SourceRefs created during this extraction (for run manifests)."""
-        return dict(self._refs)
+        return self._source_session.source_refs()
+
+    # Live compatibility views: assignment replaces the session's state too.
+    @property
+    def project_root(self) -> Path:
+        return self._source_session.project_root
+
+    @project_root.setter
+    def project_root(self, value: Path) -> None:
+        self._source_session.project_root = value
+
+    @property
+    def _cache(self) -> dict[str, pd.DataFrame]:
+        return self._source_session._cache
+
+    @_cache.setter
+    def _cache(self, value: dict[str, pd.DataFrame]) -> None:
+        self._source_session._cache = value
+
+    @property
+    def _refs(self) -> dict[str, SourceRef]:
+        return self._source_session._refs
+
+    @_refs.setter
+    def _refs(self, value: dict[str, SourceRef]) -> None:
+        self._source_session._refs = value
+
+    @property
+    def _xlsx_observations(self) -> dict[str, TrustedXlsxObservation]:
+        return self._source_session._xlsx_observations
+
+    @_xlsx_observations.setter
+    def _xlsx_observations(self, value: dict[str, TrustedXlsxObservation]) -> None:
+        self._source_session._xlsx_observations = value
 
     # ── value-extraction helpers ────────────────────────────────────────────
     def get_norm_rules(self, harmonized_field: str) -> list | dict | None:
