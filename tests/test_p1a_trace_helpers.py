@@ -7,7 +7,6 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from lib import migrated_trials
 from lib.record_keys import parse_record_key
 from lib.trace_io import read_source
 
@@ -84,11 +83,6 @@ def test_read_source_reads_default_and_explicit_xlsx_sheets(tmp_path):
 def test_read_source_missing_path_preserves_error(tmp_path):
     with pytest.raises(FileNotFoundError):
         read_source(tmp_path, "absent.csv")
-
-
-def test_migrated_trials_reexports_the_same_callables():
-    assert migrated_trials.parse_record_key is parse_record_key
-    assert migrated_trials.read_source is read_source
 
 
 def test_trace_value_imports_neutral_helpers_not_migrated_registry():
