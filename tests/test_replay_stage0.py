@@ -13,8 +13,8 @@ import pandas as pd
 import pytest
 import yaml
 
+from lib.cell_factory import CellFactory, CellIdentity
 from lib.contributions import Contribution, from_source_ref
-from lib.extractor_base import BaseExtractor
 from lib.provenance import Cell, PROVENANCE_SCHEMA_VERSION
 from lib.replay_contract import (
     REASON_CODES,
@@ -43,6 +43,7 @@ from lib.replay_manifest import (
 )
 from lib.schema_model import load as load_schema
 from lib.source_ref import SourceRef, sha256_file
+from lib.source_session import SourceSession
 from lib.spec_model import SpecError, load as load_spec, parse as parse_spec
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -254,28 +255,25 @@ def test_typed_null_is_distinct_from_absent_raw_evidence():
                "source.csv", "x", 0, "direct")
     assert old.raw_value_json == ""
 
-    class SyntheticExtractor(BaseExtractor):
-        trial_dir_name = "tests/fixtures/synthetic_replay"
-        template_trial_name = "synthetic_device_lab"
-
-    base = SyntheticExtractor(ROOT, pd.DataFrame(), {}, {}, run_id=RUN_ID,
-                              spec_ref=SPEC_REF)
-    anchor = {"cimac_part_id": "DEVICE-A", "Cimac.id": "READ-001",
-              "Collection_Event": "bench-west"}
-    absent = base.cell(anchor, "optional_note", None, 1.0, "source.csv",
-                       "optional_note", 0, "direct")
-    explicit_null = base.cell(anchor, "optional_note", None, 1.0, "source.csv",
-                              "optional_note", 0, "direct", raw_value=None,
-                              mapping_id="direct.optional_note")
+    factory = CellFactory()
+    identity = CellIdentity("synthetic_device_lab", "DEVICE-A", "READ-001", "bench-west")
+    absent = factory.build(identity, "optional_note", None, 1.0, "source.csv",
+                           "optional_note", 0, "direct", run_id=RUN_ID, spec_ref=SPEC_REF)
+    explicit_null = factory.build(identity, "optional_note", None, 1.0, "source.csv",
+                                  "optional_note", 0, "direct", raw_value=None,
+                                  run_id=RUN_ID, spec_ref=SPEC_REF,
+                                  mapping_id="direct.optional_note")
     assert absent.raw_value_json == ""
     assert explicit_null.raw_value_json == '{"kind":"null"}'
     assert explicit_null.run_id == RUN_ID
     assert explicit_null.spec_ref == SPEC_REF
     assert explicit_null.mapping_id == "direct.optional_note"
-    deliberately_omitted = base.cell(
-        anchor, "optional_note", None, 1.0, "source.csv", "optional_note",
-        0, "direct", raw_value=None, raw_evidence_recorded=False)
+    deliberately_omitted = factory.build(
+        identity, "optional_note", None, 1.0, "source.csv", "optional_note",
+        0, "direct", run_id=RUN_ID, spec_ref=SPEC_REF,
+        raw_value=None, raw_evidence_recorded=False)
     assert deliberately_omitted.raw_value_json == ""
+    assert deliberately_omitted.run_id == RUN_ID and deliberately_omitted.spec_ref == SPEC_REF
 
 
 def test_source_ref_and_contribution_backward_compatibility(tmp_path):
@@ -355,14 +353,11 @@ def test_usage_scoped_files_exclude_unreferenced_configuration(tmp_path):
 
 
 def test_csv_loader_emits_structured_effective_flags():
-    class SyntheticCsvExtractor(BaseExtractor):
-        trial_dir_name = "tests/fixtures/synthetic_replay/sources"
-        template_trial_name = "synthetic_device_lab"
-
-    extractor = SyntheticCsvExtractor(
-        ROOT, pd.DataFrame(), {"sources": {"readings": "device_readings.csv"}}, {})
-    frame = extractor.load_csv("readings")
-    ref = extractor.ref("readings")
+    source = FIXTURE / "sources/device_readings.csv"
+    session = SourceSession(ROOT, resolve_source={"readings": source}.__getitem__,
+                            context_name=lambda: "synthetic_device_lab")
+    frame = session.load_csv("readings")
+    ref = session.ref("readings")
     assert len(frame) == ref.n_rows == 2
     assert ref.reader_id == "cidc_csv@v1"
     assert dict(ref.reader_effective_flags) == {

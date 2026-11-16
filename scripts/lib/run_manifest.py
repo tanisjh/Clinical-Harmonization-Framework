@@ -5,7 +5,7 @@ reader to reconstruct it. It pins the code, the configuration, every input file
 actually opened, and every output written, each by content hash.
 
 The critical design point is that **inputs come from the reader instrumentation**
-(`BaseExtractor.source_refs()`), not from a directory scan. Phase 1a found that
+(`SourceSession.source_refs()`), not from a directory scan. Phase 1a found that
 `inspect_trial_files.py` globbed `*-clinical/` and therefore hashed 311 legacy
 files and zero of the CIDC files the pipeline actually read. A manifest built the
 same way would be confidently wrong in exactly the same manner. Here, a file

@@ -1,4 +1,4 @@
-"""Fabricated parity cases shared by source sessions and the legacy facade."""
+"""Fabricated source/session behavior with independent observation expectations."""
 from __future__ import annotations
 
 import hashlib
@@ -8,7 +8,6 @@ import pandas as pd
 import pytest
 
 from lib import source_ref, xlsx_reader
-from lib.extractor_base import BaseExtractor
 from lib.source_ref import PathContainmentError, SourceRef, assert_within_roots
 from lib.source_session import SourceSession
 from lib.xlsx_reader import (
@@ -17,19 +16,10 @@ from lib.xlsx_reader import (
 )
 
 
-class SyntheticExtractor(BaseExtractor):
-    trial_dir_name = "synthetic"
-    template_trial_name = "synthetic"
-
-
-@pytest.fixture(params=["base", "session"])
-def make_subject(request, tmp_path):
+@pytest.fixture
+def make_subject(tmp_path):
     def make(sources=None):
         sources = sources or {"data": "records.csv"}
-        if request.param == "base":
-            return SyntheticExtractor(
-                tmp_path, pd.DataFrame(),
-                {"source_dir": ".", "sources": sources}, {})
         session = SourceSession(
             tmp_path,
             resolve_source=lambda key: assert_within_roots(
@@ -176,7 +166,7 @@ def test_containment_before_io(make_subject, tmp_path, kind):
         relative = "harmonization_outputs/records.csv"
     subject = make_subject({"data": relative})
     subject.project_root = root
-    # The facade's source_dir and the standalone callback both consult the live root.
+    # The caller-supplied resolver consults the live session root.
     with pytest.raises(PathContainmentError):
         subject.load_csv("data")
     assert subject.source_refs() == {}
@@ -369,3 +359,40 @@ def test_session_callbacks_are_invoked_only_when_needed(tmp_path):
     with pytest.raises(KeyError, match="in changed;"):
         session.ref("data")
     assert calls == ["data", "data"]
+
+
+def test_source_state_replacement_preserves_behavior(make_subject, tmp_path):
+    (tmp_path / "records.csv").write_text("value\n12\n")
+    session = make_subject()
+    original = session.load_csv("data")
+    ref = session.ref("data")
+    replacement = pd.DataFrame({"value": [99]})
+    session._cache = {str(tmp_path / "records.csv"): replacement}
+    assert session.load_csv("data") is replacement
+    session._refs = {"other": ref}
+    assert session.ref("other") is ref
+    with pytest.raises(KeyError):
+        session.ref("data")
+    session._cache = {}
+    assert session.load_csv("data") is not original
+    assert session.ref("data") == ref
+
+
+def test_trusted_observation_state_replacement_is_live(make_subject, tmp_path):
+    from lib.xlsx_reader import XLSX_READER_ID
+
+    path = tmp_path / "records.xlsx"
+    pd.DataFrame({"value": [12]}).to_excel(path, sheet_name="first", index=False)
+    session = make_subject({"data": path.name})
+    session.load_xlsx("data", "first", reader_id=XLSX_READER_ID)
+    first = session._xlsx_observations["data"]
+    session._xlsx_observations = {}
+    session.load_xlsx("data", "first", reader_id=XLSX_READER_ID)
+    second = session._xlsx_observations["data"]
+    assert second is not first
+    assert session.ref("data") is second.source_ref
+    session._xlsx_observations = {"data": first}
+    session.load_xlsx("data", "first", reader_id=XLSX_READER_ID)
+    assert session._xlsx_observations["data"] is first
+    # Replacing observations alone historically does not repopulate the ref dict.
+    assert session.ref("data") is second.source_ref

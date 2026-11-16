@@ -8,20 +8,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from lib.extractor_base import BaseExtractor
+from lib.cell_factory import CellFactory, CellIdentity, anchor_str, compatibility_identity
 from lib.provenance import Cell
 from lib.source_ref import SourceRef
 
 
-class SyntheticExtractor(BaseExtractor):
-    trial_dir_name = "synthetic"
-    template_trial_name = "synthetic-trial"
-
-
 @pytest.fixture
-def base(tmp_path):
-    return SyntheticExtractor(tmp_path, pd.DataFrame(), {}, {},
-                              run_id="run-1", spec_ref="spec@1")
+def factory():
+    return CellFactory()
 
 
 ROW = {"cimac_part_id": "SYNTH-001", "Cimac.id": "SAMPLE-001",
@@ -45,9 +39,13 @@ def make_ref(sheet=None):
                      reader_id="cidc_csv@v1", sheet=sheet, source_ref_id="src-synthetic")
 
 
-def build(base, row=None, source="CONFIG:constant", **kwargs):
-    return base.cell(ROW if row is None else row, "measurement", 42, "0.75",
-                     source, "value", "legacy-index", "direct", "notes", **kwargs)
+IDENTITY = CellIdentity("synthetic-trial", "SYNTH-001", "SAMPLE-001", "event-1")
+
+
+def build(factory, identity=IDENTITY, source="CONFIG:constant", confidence="0.75", **kwargs):
+    return factory.build(identity, "measurement", 42, confidence,
+                         source, "value", "legacy-index", "direct", "notes",
+                         run_id="run-1", spec_ref="spec@1", **kwargs)
 
 
 @pytest.mark.parametrize("value,expected", [
@@ -55,51 +53,49 @@ def build(base, row=None, source="CONFIG:constant", **kwargs):
     (pd.NA, "<NA>"), (pd.NaT, "NaT"), (np.float32("nan"), "nan"),
     (Decimal("NaN"), "NaN"), (0, "0"), (False, "False"), ("None", "None"),
 ])
-def test_anchor_string_exact_legacy_null_detection(base, value, expected):
-    assert base._anchor_str(value) == expected
+def test_anchor_string_exact_legacy_null_detection(factory, value, expected):
+    assert anchor_str(value) == expected
     row = dict.fromkeys(ROW, value)
-    cell = build(base, row)
+    cell = build(factory, compatibility_identity("synthetic-trial", row))
     assert (cell.cimac_part_id, cell.Cimac_id, cell.Collection_Event) == (expected,) * 3
 
 
 @pytest.mark.parametrize("key", list(ROW))
-def test_missing_identity_has_no_alias_fallback_and_counts_failure(base, key):
+def test_missing_identity_has_no_alias_fallback(key):
     row = {**ROW, "participant": "alternative", "sample": "alternative",
            "collection_event": "alternative", "trial": "row-trial"}
     del row[key]
     with pytest.raises(KeyError) as exc:
-        build(base, row)
+        compatibility_identity("synthetic-trial", row)
     assert exc.value.args == (key,)
-    assert base._legacy_label_uses == 1
 
 
-def test_identity_uses_exact_keys_and_verbatim_current_trial(base):
+def test_identity_uses_exact_keys_and_verbatim_current_trial(factory):
     row = {**ROW, "participant": "wrong", "sample": "wrong",
            "collection_event": "wrong", "trial": "wrong"}
-    base.template_trial_name = 17
-    cell = build(base, row)
+    cell = build(factory, compatibility_identity(17, row))
     assert cell.trial == 17
     assert (cell.cimac_part_id, cell.Cimac_id, cell.Collection_Event) == tuple(ROW.values())
 
 
 @pytest.mark.parametrize("source", ["records.csv", "CONFIG:constant", "DERIVED:value", "", None, 0])
-def test_legacy_labels_are_verbatim_with_blank_structured_fields(base, source):
-    cell = build(base, source=source)
+def test_legacy_labels_are_verbatim_with_blank_structured_fields(factory, source):
+    cell = build(factory, source=source)
     assert cell.source_file is source and cell.source_logical_label is source
     assert (cell.source_resolved_path, cell.source_sha256,
             cell.source_sheet, cell.source_ref_id) == ("",) * 4
-    assert base._legacy_label_uses == 1
+    assert factory.legacy_label_uses == 1
 
 
 @pytest.mark.parametrize("sheet", [None, "first"])
-def test_source_ref_metadata_and_no_legacy_accounting(base, sheet):
+def test_source_ref_metadata_and_no_legacy_accounting(factory, sheet):
     ref = make_ref(sheet)
-    cell = build(base, source=ref)
+    cell = build(factory, source=ref)
     assert cell.source_file == cell.source_logical_label == ref.logical_label
     assert cell.source_resolved_path == ref.resolved_path
     assert cell.source_sha256 == ref.sha256 and cell.source_ref_id == ref.source_ref_id
     assert cell.source_sheet == (sheet or "")
-    assert base._legacy_label_uses == 0
+    assert factory.legacy_label_uses == 0
 
 
 @pytest.mark.parametrize("kwargs,legacy,encoded", [
@@ -111,62 +107,50 @@ def test_source_ref_metadata_and_no_legacy_accounting(base, sheet):
     ({"raw_value": None, "raw_evidence_recorded": False}, "", ""),
     ({"raw_value": 0, "raw_evidence_recorded": False}, 0, ""),
 ])
-def test_raw_absence_null_and_falsey_values(base, kwargs, legacy, encoded):
-    cell = build(base, **kwargs)
+def test_raw_absence_null_and_falsey_values(factory, kwargs, legacy, encoded):
+    cell = build(factory, **kwargs)
     assert type(cell.raw_value) is type(legacy) and cell.raw_value == legacy
     assert cell.raw_value_json == encoded
 
 
 @pytest.mark.parametrize("source,is_legacy", [("legacy", True), (make_ref(), False)])
-@pytest.mark.parametrize("failure", ["identity", "confidence", "raw"])
-def test_counter_precedes_later_failures(base, source, is_legacy, failure):
-    args = {"source": source}
-    error = ValueError
-    if failure == "identity":
-        args["row"] = {}
-        error = KeyError
-    elif failure == "confidence":
-        # Call directly to supply invalid confidence.
-        with pytest.raises(ValueError):
-            base.cell(ROW, "measurement", 42, "invalid", source, "value", 0, "direct")
-        assert base._legacy_label_uses == int(is_legacy)
-        return
-    else:
-        args["raw_value"] = {"unsupported": True}
-    with pytest.raises(error):
-        build(base, **args)
-    assert base._legacy_label_uses == int(is_legacy)
+@pytest.mark.parametrize("failure", ["confidence", "raw"])
+def test_counter_precedes_later_failures(factory, source, is_legacy, failure):
+    kwargs = {"confidence": "invalid"} if failure == "confidence" else {"raw_value": {"unsupported": True}}
+    with pytest.raises(ValueError):
+        build(factory, source=source, **kwargs)
+    assert factory.legacy_label_uses == int(is_legacy)
 
 
-def test_unsupported_raw_is_retained_when_evidence_disabled(base):
+def test_unsupported_raw_is_retained_when_evidence_disabled(factory):
     raw = {"unsupported": True}
-    cell = build(base, raw_value=raw, raw_evidence_recorded=False)
+    cell = build(factory, raw_value=raw, raw_evidence_recorded=False)
     assert cell.raw_value is raw and cell.raw_value_json == ""
 
 
 @pytest.mark.parametrize("confidence", [-2, 3, True, float("inf")])
-def test_confidence_has_float_conversion_without_new_range_checks(base, confidence):
-    cell = base.cell(ROW, "measurement", 42, confidence, "legacy", "value", 0, "direct")
+def test_confidence_has_float_conversion_without_new_range_checks(factory, confidence):
+    cell = build(factory, confidence=confidence, source="legacy")
     assert cell.confidence == float(confidence) and type(cell.confidence) is float
 
 
 @pytest.mark.parametrize("row_number", [None, 0, False, "row-1"])
 @pytest.mark.parametrize("record_key", [None, "", 0, False, "record=SYNTH-001"])
-def test_locator_none_and_falsey_behavior(base, row_number, record_key):
-    cell = build(base, source_row_number=row_number, source_record_key=record_key)
+def test_locator_none_and_falsey_behavior(factory, row_number, record_key):
+    cell = build(factory, source_row_number=row_number, source_record_key=record_key)
     expected = "" if row_number is None else row_number
     assert type(cell.source_row_number) is type(expected) and cell.source_row_number == expected
     assert cell.source_record_key == (record_key or "")
     assert cell.source_row_idx == "legacy-index" and cell.source_column == "value"
 
 
-def test_exact_cell_fields_record_order_and_provenance_passthrough(base):
+def test_exact_cell_fields_record_order_and_provenance_passthrough(factory):
     options = dict(mapping_id="map-1", rule_id="rule-1", rule_version="1",
                    contributions='[{"order":2},{"order":1}]', derivation='{"z":0,"a":1}',
                    value_state="provisional", authoritative_for="z;a",
                    evidence_refs="evidence-z;evidence-a", raw_value=False,
                    source_row_number=0, source_record_key="record=SYNTH-001")
-    cell = build(base, source=make_ref("first"), **options)
+    cell = build(factory, source=make_ref("first"), **options)
     assert isinstance(cell, Cell)
     assert tuple(f.name for f in fields(cell)) == FIELD_ORDER
     record = cell.as_record()
@@ -180,30 +164,97 @@ def test_exact_cell_fields_record_order_and_provenance_passthrough(base):
     assert cell.extraction_method == "direct"
 
 
-@pytest.mark.parametrize("source", ["CONFIG:constant", make_ref("first")])
-@pytest.mark.parametrize("options", [
-    {}, {"raw_value": None}, {"raw_value": 0}, {"raw_value": False},
-    {"raw_value": "text"}, {"raw_value": 2.5},
-    {"raw_value": None, "raw_evidence_recorded": False},
-    {"raw_value": 0, "raw_evidence_recorded": False},
-])
-def test_explicit_factory_matches_characterized_facade(base, source, options):
-    from lib.cell_factory import CellFactory, CellIdentity
+# Literal Cell-v1 records captured before shim retirement; no deleted reference owner.
+FROZEN_RECORDS = (
+    {
+        'trial': 'synthetic-trial',
+        'cimac_part_id': 'SYNTH-001',
+        'Collection_Event': 'event-1',
+        'harmonized_field': 'measurement',
+        'value': 42,
+        'confidence': 0.75,
+        'source_file': 'CONFIG:constant',
+        'source_column': 'value',
+        'source_row_idx': 'legacy-index',
+        'extraction_method': 'direct',
+        'notes': 'notes',
+        'source_logical_label': 'CONFIG:constant',
+        'source_resolved_path': '',
+        'source_sha256': '',
+        'source_sheet': '',
+        'source_row_number': 0,
+        'source_record_key': 'record=SYNTH-001',
+        'raw_value': '',
+        'rule_id': 'rule-1',
+        'rule_version': '1',
+        'contributions': '[{"z":0,"a":1}]',
+        'authoritative_for': 'z;a',
+        'derivation': '{"z":0,"a":1}',
+        'value_state': 'provisional',
+        'run_id': 'run-1',
+        'spec_ref': 'spec@1',
+        'mapping_id': 'map-1',
+        'source_ref_id': '',
+        'raw_value_json': '',
+        'evidence_refs': 'z;a',
+        'Cimac.id': 'SAMPLE-001',
+    },
+    {
+        'trial': 'synthetic-trial',
+        'cimac_part_id': 'SYNTH-001',
+        'Collection_Event': 'event-1',
+        'harmonized_field': 'measurement',
+        'value': 42,
+        'confidence': 0.75,
+        'source_file': 'stable.csv',
+        'source_column': 'value',
+        'source_row_idx': 'legacy-index',
+        'extraction_method': 'direct',
+        'notes': 'notes',
+        'source_logical_label': 'stable.csv',
+        'source_resolved_path': 'inputs/records.csv',
+        'source_sha256': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'source_sheet': 'first',
+        'source_row_number': 0,
+        'source_record_key': 'record=SYNTH-001',
+        'raw_value': '',
+        'rule_id': 'rule-1',
+        'rule_version': '1',
+        'contributions': '[{"z":0,"a":1}]',
+        'authoritative_for': 'z;a',
+        'derivation': '{"z":0,"a":1}',
+        'value_state': 'provisional',
+        'run_id': 'run-1',
+        'spec_ref': 'spec@1',
+        'mapping_id': 'map-1',
+        'source_ref_id': 'src-synthetic',
+        'raw_value_json': '',
+        'evidence_refs': 'z;a',
+        'Cimac.id': 'SAMPLE-001',
+    },
+)
 
-    identity = CellIdentity(base.template_trial_name, *ROW.values())
-    factory = CellFactory()
-    kwargs = dict(source_row_number=0, source_record_key="record=SYNTH-001",
-                  mapping_id="map-1", rule_id="rule-1", rule_version="1",
-                  contributions='[{"z":0,"a":1}]', derivation='{"z":0,"a":1}',
-                  authoritative_for="z;a", value_state="provisional", evidence_refs="z;a",
-                  **options)
-    expected = build(base, source=source, **kwargs)
-    actual = factory.build(identity, "measurement", 42, "0.75", source, "value",
-                           "legacy-index", "direct", "notes", run_id="run-1",
-                           spec_ref="spec@1", **kwargs)
-    assert actual == expected
-    assert tuple(actual.as_record().items()) == tuple(expected.as_record().items())
-    assert factory.legacy_label_uses == base._legacy_label_uses
+
+@pytest.mark.parametrize("source,index", [("CONFIG:constant", 0), (make_ref("first"), 1)])
+@pytest.mark.parametrize("options,raw,encoded", [
+    ({}, "", ""), ({"raw_value": None}, "", '{"kind":"null"}'),
+    ({"raw_value": 0}, 0, '{"kind":"integer","value":"0"}'),
+    ({"raw_value": False}, False, '{"kind":"boolean","value":false}'),
+    ({"raw_value": "text"}, "text", '{"kind":"string","value":"text"}'),
+    ({"raw_value": 2.5}, 2.5, '{"kind":"number","value":"2.5"}'),
+    ({"raw_value": None, "raw_evidence_recorded": False}, "", ""),
+    ({"raw_value": 0, "raw_evidence_recorded": False}, 0, ""),
+])
+def test_explicit_factory_matches_frozen_cell_records(factory, source, index, options, raw, encoded):
+    cell = build(factory, source=source, source_row_number=0,
+                 source_record_key="record=SYNTH-001", mapping_id="map-1",
+                 rule_id="rule-1", rule_version="1", contributions='[{"z":0,"a":1}]',
+                 derivation='{"z":0,"a":1}', authoritative_for="z;a",
+                 value_state="provisional", evidence_refs="z;a", **options)
+    expected = {**FROZEN_RECORDS[index], "raw_value": raw, "raw_value_json": encoded}
+    assert tuple(cell.as_record().items()) == tuple(expected.items())
+    assert type(cell.raw_value) is type(raw)
+    assert factory.legacy_label_uses == int(index == 0)
 
 
 def test_identity_is_explicit_frozen_and_separate_from_legacy_adaptation():
@@ -242,20 +293,16 @@ def test_direct_factory_failure_counter(source, expected_count, options, error):
     assert factory.legacy_label_uses == expected_count
 
 
-def test_raw_sentinel_singleton_and_defaults(base):
+def test_raw_sentinel_singleton_and_defaults(factory):
     import inspect
 
-    from lib import cell_factory, extractor_base
+    from lib import cell_factory, spec_executor
 
     sentinel = cell_factory.RAW_VALUE_ABSENT
-    assert extractor_base._RAW_VALUE_ABSENT is sentinel
-    for method in (BaseExtractor.cell, cell_factory.CellFactory.build,
-                   cell_factory.CellFactory._build_prepared):
+    assert spec_executor._RAW_VALUE_ABSENT is sentinel
+    for method in (spec_executor.SpecExecutor.cell, CellFactory.build, CellFactory._build_prepared):
         assert inspect.signature(method).parameters["raw_value"].default is sentinel
-    assert build(base, raw_value=sentinel).raw_value_json == ""
-    factory = cell_factory.CellFactory()
-    cell = factory.build(cell_factory.CellIdentity("t", "p", "s", "e"),
-                         "f", 1, 1, "legacy", "column", 0, "direct", raw_value=sentinel)
+    cell = build(factory, raw_value=sentinel)
     assert cell.raw_value == cell.raw_value_json == ""
 
 

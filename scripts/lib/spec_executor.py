@@ -6,8 +6,7 @@ generic operations plus external-anchor sourcing, which is exactly what the
 S1400I pilot needs, and it refuses anything else instead of guessing.
 
 The executor composes SourceSession for observed sources and CellFactory for
-Cell-v1 provenance construction. BaseExtractor retains those same components
-for compatibility users; modern execution does not inherit from it.
+Cell-v1 provenance construction, with no extractor superclass.
 
 Source resolution belongs to this executor: the approved specification is the
 sole authority on which exact files are opened, with containment and no basename

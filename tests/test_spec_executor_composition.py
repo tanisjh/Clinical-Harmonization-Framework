@@ -12,7 +12,6 @@ import yaml
 from lib import normalize, rule_registry
 from lib.anchor_evidence import RuntimeSourceRefs, load_external_anchor
 from lib.cell_factory import RAW_VALUE_ABSENT, CellFactory
-from lib.extractor_base import BaseExtractor
 from lib.source_ref import PathContainmentError
 from lib.source_session import SourceSession
 from lib.spec_executor import ExecutionError, SpecExecutor, _READER_LOADERS, execute
@@ -95,6 +94,8 @@ def test_csv_legacy_cache_mutability_and_live_state(case):
         assert getattr(ex, name) is other
     ex.project_root = c.root / "other"
     assert ex._source_session.project_root == c.root / "other"
+    ex._source_session.project_root = c.root
+    assert ex.project_root is c.root
 
 
 @pytest.mark.parametrize("sheet", [None, 0, "Readings"])
@@ -179,6 +180,7 @@ def test_external_anchor_reuses_observed_ref_and_evidence_without_io(tmp_path, m
         patch.setattr(Path, "read_bytes", forbidden)
         ex = SpecExecutor(spec, ROOT, runtime)
     assert ex.ref("$anchor") is runtime.source_ref
+    assert ex._source_session.ref("$anchor") is runtime.source_ref
     assert ex._anchor_evidence is runtime.evidence
     list(ex.extract())
     assert ex.diagnostics.sources.anchor_evidence == (runtime.evidence,)
@@ -293,7 +295,6 @@ def test_architecture_and_unchanged_public_signatures():
     import inspect
     from lib import spec_executor
 
-    assert not issubclass(SpecExecutor, BaseExtractor)
     assert SpecExecutor.__bases__ == (object,)
     parameters = inspect.signature(SpecExecutor.__init__).parameters
     assert list(parameters) == ["self", "spec", "project_root", "anchor_df", "contract", "targets", "run_id"]
@@ -301,7 +302,22 @@ def test_architecture_and_unchanged_public_signatures():
     assert parameters["contract"].kind is inspect.Parameter.KEYWORD_ONLY
     assert list(inspect.signature(execute).parameters) == ["spec", "project_root", "anchor_df", "contract", "targets", "run_id"]
     assert list(inspect.signature(SpecExecutor.extract).parameters) == ["self"]
-    assert inspect.signature(SpecExecutor.cell) == inspect.signature(BaseExtractor.cell)
+    cell_parameters = inspect.signature(SpecExecutor.cell).parameters
+    assert list(cell_parameters) == [
+        "self", "anchor_row", "harmonized_field", "value", "confidence", "source_file",
+        "source_column", "source_row_idx", "extraction_method", "notes", "raw_value",
+        "source_row_number", "source_record_key", "rule_id", "rule_version", "contributions",
+        "authoritative_for", "derivation", "value_state", "mapping_id", "evidence_refs",
+        "raw_evidence_recorded"]
+    assert {name: parameter.default for name, parameter in cell_parameters.items()
+            if parameter.default is not inspect.Parameter.empty} == {
+        "notes": "", "raw_value": RAW_VALUE_ABSENT, "source_row_number": None,
+        "source_record_key": None, "rule_id": "", "rule_version": "", "contributions": "",
+        "authoritative_for": "", "derivation": "", "value_state": "", "mapping_id": "",
+        "evidence_refs": "", "raw_evidence_recorded": True}
+    for index, parameter in enumerate(cell_parameters.values()):
+        assert parameter.kind is (inspect.Parameter.POSITIONAL_OR_KEYWORD if index < 10
+                                  else inspect.Parameter.KEYWORD_ONLY)
     tree = ast.parse(Path(spec_executor.__file__).read_text())
     cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "SpecExecutor")
     assert not any(isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "super"
@@ -348,7 +364,7 @@ assert "lib.extractor_base" not in sys.modules
     subprocess.run([sys.executable, "-B", "-c", code], cwd=ROOT, check=True)
 
 
-def test_modern_runtime_uses_shared_components_and_not_base_facades(case, monkeypatch):
+def test_modern_runtime_uses_shared_source_and_cell_components(case, monkeypatch):
     c = case()
     sessions, factories = [], []
     load, finish = SourceSession.load_csv, CellFactory._build_prepared
@@ -358,12 +374,8 @@ def test_modern_runtime_uses_shared_components_and_not_base_facades(case, monkey
     def cell_spy(factory, *args, **kwargs):
         factories.append(factory)
         return finish(factory, *args, **kwargs)
-    def forbidden(*args, **kwargs):
-        pytest.fail("modern execution called a BaseExtractor facade")
     monkeypatch.setattr(SourceSession, "load_csv", load_spy)
     monkeypatch.setattr(CellFactory, "_build_prepared", cell_spy)
-    monkeypatch.setattr(BaseExtractor, "load_csv", forbidden)
-    monkeypatch.setattr(BaseExtractor, "cell", forbidden)
     assert len(list(c.executor.extract())) == 4
     assert sessions and all(s is c.executor._source_session for s in sessions)
     assert len(factories) == 4 and all(f is c.executor._cell_factory for f in factories)
@@ -404,3 +416,197 @@ def test_lookup_miss_cells_keep_source_identity_and_order(case):
     assert all(cell.source_ref_id == diagnostics.sources["readings"].source_ref_id for cell in cells)
     assert all(cell.confidence == .1 and cell.source_row_idx == -1 for cell in cells)
     assert diagnostics.lookup_misses == ("DEVICE-Z",)
+
+
+def test_invalid_confidence_precedes_missing_run_context(case):
+    ex = case().executor
+    del ex.run_id
+    row = {"cimac_part_id": "SYNTH-001", "Cimac.id": "SAMPLE-001", "Collection_Event": "event-1"}
+    with pytest.raises(ValueError, match="could not convert string to float"):
+        ex.cell(row, "field", 1, "invalid", "legacy", "column", 0, "direct")
+    assert ex._legacy_label_uses == 1
+
+
+def test_legacy_counter_has_one_live_factory_owner(case):
+    from lib.cell_factory import CellFactory
+
+    ex = case().executor
+    other = case().executor
+    assert ex._cell_factory is not other._cell_factory
+    session = ex._source_session
+    ex._legacy_label_uses = 7
+    assert ex._cell_factory.legacy_label_uses == 7
+    ex._cell_factory.legacy_label_uses = 11
+    assert ex._legacy_label_uses == 11
+    ex._cell_factory = CellFactory()
+    assert ex._legacy_label_uses == other._legacy_label_uses == 0
+    assert ex._source_session is session
+
+
+def test_cell_context_is_live_and_source_session_unchanged(case):
+    ex = case().executor
+    session = ex._source_session
+    row = {"cimac_part_id": "SYNTH-001", "Cimac.id": "SAMPLE-001", "Collection_Event": "event-1"}
+    for trial, run, spec in [("trial-1", "run-1", "spec@1"), ("trial-2", "run-2", "spec@2")]:
+        ex.template_trial_name, ex.run_id, ex.spec_ref = trial, run, spec
+        cell = ex.cell(row, "field", False, 1, "legacy", "column", 0, "direct")
+        assert (cell.trial, cell.run_id, cell.spec_ref) == (trial, run, spec)
+    assert ex._legacy_label_uses == 2
+    assert ex._source_session is session and ex.source_refs() == {}
+
+
+def test_normalizer_overrides_are_resolved_before_each_identity_lookup(case):
+    ex = case().executor
+    ex._anchor_str = lambda value: "initial:" + value
+
+    class Row:
+        def __getitem__(self, key):
+            ex._anchor_str = lambda value: "next:" + value
+            return key
+
+    cell = ex.cell(Row(), "field", 1, 1, "legacy", "column", 0, "direct")
+    assert cell.cimac_part_id == "initial:cimac_part_id"
+    assert cell.Cimac_id == "next:Cimac.id"
+    assert cell.Collection_Event == "next:Collection_Event"
+
+
+@pytest.mark.parametrize("reader", [item[0] for item in READERS])
+def test_all_cached_readers_reconsult_current_resolver(case, reader):
+    c = case(reader)
+    ex = c.executor
+    calls = []
+
+    def resolve(key):
+        calls.append(key)
+        return c.source
+
+    ex.src_path = resolve
+    ex._load_source("readings")
+    ex._load_source("readings")
+    assert calls == ["readings", "readings"]
+
+    def refuse(key):
+        raise LookupError("current resolver refuses source")
+
+    ex.src_path = refuse
+    with pytest.raises(LookupError, match="current resolver refuses source"):
+        ex._load_source("readings")
+
+
+def test_replaced_resolver_can_select_a_different_observed_file(case):
+    c = case()
+    ex = c.executor
+    original = ex.load_csv("readings")
+    second = c.source.with_name("second.csv")
+    second.write_text("value\n34\n")
+    ex.src_path = lambda key: second
+    assert ex.load_csv("readings").loc[0, "value"] == 34
+    assert ex.ref("readings").resolved_path == "second.csv"
+    ex.src_path = lambda key: c.source
+    assert ex.load_csv("readings") is original
+
+
+@pytest.mark.parametrize("source_kind", ["legacy", "observed"])
+@pytest.mark.parametrize("failure", ["identity", "confidence", "raw"])
+def test_cell_facade_accounts_before_later_failures(case, source_kind, failure):
+    c = case()
+    ex = c.executor
+    source = "legacy"
+    if source_kind == "observed":
+        ex.load_csv("readings")
+        source = ex.ref("readings")
+    options = {"raw_value": object()} if failure == "raw" else {}
+    with pytest.raises(KeyError if failure == "identity" else ValueError):
+        ex.cell({} if failure == "identity" else ROW, "field", 1,
+                "invalid" if failure == "confidence" else 1, source,
+                "column", 0, "direct", **options)
+    assert ex._legacy_label_uses == int(source_kind == "legacy")
+
+
+@pytest.mark.parametrize("key", ["cimac_part_id", "Cimac.id", "Collection_Event"])
+def test_cell_facade_missing_identity_has_no_alias_fallback(case, key):
+    ex = case().executor
+    row = {**ROW, "participant": "alternative", "sample": "alternative",
+           "collection_event": "alternative", "trial": "ignored"}
+    del row[key]
+    with pytest.raises(KeyError) as exc:
+        ex.cell(row, "field", 1, 1, "legacy", "column", 0, "direct")
+    assert exc.value.args == (key,)
+    assert ex._legacy_label_uses == 1
+
+
+def test_cell_evaluation_order_including_late_failure(case, monkeypatch):
+    ex = case().executor
+    events = []
+
+    def trial(instance):
+        events.append("trial")
+        assert instance._legacy_label_uses == 1
+        return "trial-verbatim"
+
+    def run(instance):
+        events.append("run")
+        return "run-verbatim"
+
+    def spec(instance):
+        events.append("spec")
+        return "spec-verbatim"
+
+    def normalize(value):
+        events.append("normalize:" + value)
+        return "normalized:" + value
+
+    class Row:
+        def __getitem__(self, key):
+            events.append("get:" + key)
+            return key
+
+    class Confidence:
+        def __float__(self):
+            events.append("confidence")
+            return 0.75
+
+    class RecordKey:
+        def __bool__(self):
+            events.append("record-key")
+            return False
+
+    # Instrument the real modern facade after initialization; no replacement extractor.
+    monkeypatch.setattr(SpecExecutor, "template_trial_name", property(trial), raising=False)
+    monkeypatch.setattr(SpecExecutor, "run_id", property(run), raising=False)
+    monkeypatch.setattr(SpecExecutor, "spec_ref", property(spec), raising=False)
+    ex._anchor_str = normalize
+    with pytest.raises(ValueError, match="raw value is not a supported scalar: object"):
+        ex.cell(Row(), "field", 1, Confidence(), "legacy", "column", 0,
+                "direct", source_record_key=RecordKey(), raw_value=object())
+    assert events == ["trial", "get:cimac_part_id", "normalize:cimac_part_id",
+                      "get:Cimac.id", "normalize:Cimac.id",
+                      "get:Collection_Event", "normalize:Collection_Event",
+                      "confidence", "record-key", "run", "spec"]
+    assert ex._legacy_label_uses == 1
+
+
+def test_retired_base_absent_and_runtime_has_only_shared_component_owners():
+    import ast
+
+    assert not (ROOT / "scripts/lib/extractor_base.py").exists()
+    owners = {"SourceSession": [], "CellFactory": []}
+    for path in sorted((ROOT / "scripts").rglob("*.py")):
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                assert node.name != "BaseExtractor", path
+                if node.name in owners:
+                    owners[node.name].append(path.relative_to(ROOT).as_posix())
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                names = [alias.name for alias in node.names]
+                if isinstance(node, ast.ImportFrom):
+                    names.append(node.module or "")
+                assert not any({"extractor_base", "BaseExtractor"} & set(name.split("."))
+                               for name in names), path
+            elif isinstance(node, ast.Name):
+                assert node.id != "BaseExtractor", path
+            elif isinstance(node, ast.Attribute):
+                assert node.attr != "BaseExtractor", path
+    assert owners == {"SourceSession": ["scripts/lib/source_session.py"],
+                      "CellFactory": ["scripts/lib/cell_factory.py"]}

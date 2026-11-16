@@ -93,7 +93,7 @@ class Cell:
 
     # ── Phase 1a structured provenance (additive) ────────────────────────────
     # All default to "" so unmigrated extractors construct Cells unchanged and
-    # simply leave these blank. Populated by BaseExtractor.cell() when it is
+    # simply leave these blank. Populated by CellFactory when it is
     # handed a SourceRef instead of a bare filename string.
     #
     # `source_file` above is retained verbatim for compatibility; it is a
