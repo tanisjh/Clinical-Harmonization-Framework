@@ -156,7 +156,7 @@ def test_external_anchor_registration_reuses_observed_ref_without_io(tmp_path, m
         patch.setattr(Path, "open", forbidden)
         patch.setattr(Path, "read_bytes", forbidden)
         executor = SpecExecutor(spec, tmp_path, anchor)
-    assert isinstance(executor, BaseExtractor)
+    assert not isinstance(executor, BaseExtractor)
     assert executor.ref(EXTERNAL_ANCHOR_SOURCE_ID) is anchor.source_ref
     assert executor._source_session.ref(EXTERNAL_ANCHOR_SOURCE_ID) is anchor.source_ref
     assert executor._anchor_evidence is anchor.evidence

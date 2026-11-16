@@ -5,20 +5,13 @@ than merely validating one. It is deliberately small: it supports the four
 generic operations plus external-anchor sourcing, which is exactly what the
 S1400I pilot needs, and it refuses anything else instead of guessing.
 
-The executor is conceptually a twelfth extractor whose instructions come from
-YAML instead of Python. It subclasses ``BaseExtractor`` on purpose, so it
-inherits the pieces that must not be reimplemented:
+The executor composes SourceSession for observed sources and CellFactory for
+Cell-v1 provenance construction. BaseExtractor retains those same components
+for compatibility users; modern execution does not inherit from it.
 
-  * ``load_csv`` / ``load_xlsx`` — the only constructors of a ``SourceRef``,
-    with path containment enforced and no basename fallback;
-  * ``cell()`` — the single ``Cell`` factory, so there is no parallel
-    provenance system;
-  * ``source_refs()`` — what the run manifest reads.
-
-What it does NOT inherit is source *resolution*: ``BaseExtractor.src_path``
-reads ``harmonization_config.yaml``. This class overrides it so that the
-approved specification is the sole authority on which files are opened.
-``migrated_trials.py`` is never consulted.
+Source resolution belongs to this executor: the approved specification is the
+sole authority on which exact files are opened, with containment and no basename
+fallback. ``migrated_trials.py`` is never consulted.
 
 A ``custom_rule`` mapping is executed by resolving its ``(rule_id, version)``
 through :mod:`lib.rule_registry`. The specification never names Python. Rules of
@@ -118,7 +111,14 @@ from lib.group_selection import (
     select_first_containing_record,
     source_group_id_for_mapping,
 )
-from lib.extractor_base import BaseExtractor
+from lib.cell_factory import (
+    RAW_VALUE_ABSENT as _RAW_VALUE_ABSENT,
+    CellFactory,
+    anchor_str,
+    compatibility_identity,
+)
+from lib.source_session import SourceSession
+from lib.xlsx_reader import TrustedXlsxObservation
 from lib.provenance import Cell, canonical_row_identity, provenance_event_ref
 from lib.raw_policy import (
     COMPLETION_FALLBACK_EXHAUSTED,
@@ -254,7 +254,7 @@ def _is_missing(value: Any) -> bool:
     return is_missing_scalar(value)
 
 
-class SpecExecutor(BaseExtractor):
+class SpecExecutor:
     """Execute a HarmonizationSpec against its declared sources."""
 
     def __init__(self, spec: HarmonizationSpec, project_root: Path,
@@ -279,8 +279,8 @@ class SpecExecutor(BaseExtractor):
         self.contract = contract
         self._targets = tuple(targets) if targets is not None else None
         self._rules: dict[str, rule_registry.RegisteredRule] = {}
-        # BaseExtractor identity. `trial_dir_name` is only used for messages and
-        # for the default source root, which src_path() overrides.
+        # Legacy context attributes remain visible; modern resolution uses spec.
+        # trial_dir_name also supplies source-session diagnostic context.
         self.trial_dir_name = spec.spec_id
         self.template_trial_name = spec.trial
         constructs_anchor = spec.record.anchor == "grouping"
@@ -307,14 +307,19 @@ class SpecExecutor(BaseExtractor):
                 f"{spec.ref}: record.anchor is 'grouping', so the records are "
                 f"constructed from {spec.record.anchor_source!r}; supplying an "
                 f"anchor would silently override them")
-        # A grouped anchor cannot be built here: building it opens a source, and
-        # opening a source needs the initialised BaseExtractor. It is built at
-        # the top of extract(), which is also where its row count becomes known.
-        super().__init__(project_root=project_root,
-                         anchor_df=(pd.DataFrame() if anchor_df is None
-                                    else anchor_df),
-                         trial_config={}, value_norms={}, derived_rules={},
-                         run_id=run_id, spec_ref=spec.ref)
+        # A grouping source is observed at extract(), after session setup.
+        self._source_session = SourceSession(
+            project_root, resolve_source=lambda key: self.src_path(key),
+            context_name=lambda: self.trial_dir_name)
+        self.trial_dir = self.project_root / self.trial_dir_name
+        self.anchor = (pd.DataFrame() if anchor_df is None else anchor_df).reset_index(drop=True)
+        # Retain these legacy compatibility attributes; modern execution uses spec.
+        self.cfg = {}
+        self.value_norms = {}
+        self.derived_rules = {}
+        self.run_id = run_id
+        self.spec_ref = spec.ref
+        self._cell_factory = CellFactory()
         #: The group behind each record, in record order, or None where the
         #: record was added by declaration rather than found in the data.
         self._grouped: list[GroupedRecord | None] = []
@@ -326,19 +331,145 @@ class SpecExecutor(BaseExtractor):
         ) = (self._external_anchor.evidence
              if self._external_anchor is not None else None)
         if self._external_anchor is not None:
-            self._refs[EXTERNAL_ANCHOR_SOURCE_ID] = \
-                self._external_anchor.source_ref
+            self._source_session._register_observed_ref(
+                EXTERNAL_ANCHOR_SOURCE_ID, self._external_anchor.source_ref)
         self.diagnostics = Diagnostics(spec_ref=spec.ref, trial=spec.trial,
                                        anchor_rows=len(self.anchor))
+
+    # ── shared components and compatibility facades ───────────────────────
+    def load_csv(self, key: str, logical_label: str | None = None) -> pd.DataFrame:
+        """Read a configured CSV and record a SourceRef for it.
+
+        Args:
+            key:           logical input key in cfg['sources'].
+            logical_label: stable label for config lookups and the existing
+                           provenance `source_file` column. Defaults to the
+                           basename actually opened. Repointed trials pass the
+                           legacy basename here so `column_map` keys and
+                           historical provenance values stay unchanged.
+        """
+        return self._source_session.load_csv(key, logical_label)
+
+    def load_xlsx(self, key: str, sheet: str | int | None = None,
+                  logical_label: str | None = None, *,
+                  reader_id: str = "excel@v1") -> pd.DataFrame:
+        return self._source_session.load_xlsx(
+            key, sheet, logical_label, reader_id=reader_id)
+
+    def ref(self, key: str) -> SourceRef:
+        """SourceRef for a previously loaded logical input."""
+        return self._source_session.ref(key)
+
+    def source_refs(self) -> dict[str, SourceRef]:
+        """All SourceRefs created during this extraction (for run manifests)."""
+        return self._source_session.source_refs()
+
+    # Live compatibility views: assignment replaces the session's state too.
+    @property
+    def project_root(self) -> Path:
+        return self._source_session.project_root
+
+    @project_root.setter
+    def project_root(self, value: Path) -> None:
+        self._source_session.project_root = value
+
+    @property
+    def _cache(self) -> dict[str, pd.DataFrame]:
+        return self._source_session._cache
+
+    @_cache.setter
+    def _cache(self, value: dict[str, pd.DataFrame]) -> None:
+        self._source_session._cache = value
+
+    @property
+    def _refs(self) -> dict[str, SourceRef]:
+        return self._source_session._refs
+
+    @_refs.setter
+    def _refs(self, value: dict[str, SourceRef]) -> None:
+        self._source_session._refs = value
+
+    @property
+    def _xlsx_observations(self) -> dict[str, TrustedXlsxObservation]:
+        return self._source_session._xlsx_observations
+
+    @_xlsx_observations.setter
+    def _xlsx_observations(self, value: dict[str, TrustedXlsxObservation]) -> None:
+        self._source_session._xlsx_observations = value
+
+    # ── Cell construction ────────────────────────────────────────────────────
+    @staticmethod
+    def _anchor_str(value) -> str:
+        """Compatibility facade for the shared Cell-v1 normalizer."""
+        return anchor_str(value)
+
+    @property
+    def _legacy_label_uses(self) -> int:
+        return self._cell_factory.legacy_label_uses
+
+    @_legacy_label_uses.setter
+    def _legacy_label_uses(self, value: int) -> None:
+        self._cell_factory.legacy_label_uses = value
+
+    def cell(self, anchor_row, harmonized_field, value, confidence, source_file,
+             source_column, source_row_idx, extraction_method, notes="", *,
+             raw_value=_RAW_VALUE_ABSENT, source_row_number=None, source_record_key=None,
+             rule_id="", rule_version="", contributions="",
+             authoritative_for="", derivation="", value_state="",
+             mapping_id="", evidence_refs="", raw_evidence_recorded=True):
+        """Build a Cell.
+
+        `source_file` accepts either:
+          * a `SourceRef` (migrated path) — the structured provenance fields
+            (resolved path, sha256, sheet) are filled from the file that was
+            actually opened, and the legacy `source_file` column keeps carrying
+            `ref.logical_label` so existing consumers are unaffected; or
+          * a plain string (not yet migrated, or a non-file source such as
+            "CONFIG:trial_constants" / "DERIVED:BOR") — structured fields stay
+            empty and the legacy-label counter is incremented.
+        """
+        source = self._cell_factory._prepare_source(source_file)
+        identity = compatibility_identity(
+            self.template_trial_name, anchor_row, get_anchor_str=lambda: self._anchor_str)
+        return self._cell_factory._build_prepared(
+            identity, harmonized_field, value, confidence, source, source_column,
+            source_row_idx, extraction_method, notes,
+            run_id=lambda: self.run_id, spec_ref=lambda: self.spec_ref,
+            raw_value=raw_value, source_row_number=source_row_number,
+            source_record_key=source_record_key, rule_id=rule_id,
+            rule_version=rule_version, contributions=contributions,
+            authoritative_for=authoritative_for, derivation=derivation,
+            value_state=value_state, mapping_id=mapping_id,
+            evidence_refs=evidence_refs, raw_evidence_recorded=raw_evidence_recorded)
+
+    # Legacy scientific conveniences are unused by the modern runtime. Keep
+    # lazy compatibility calls to the existing implementations until P1F review.
+    def get_norm_rules(self, harmonized_field: str) -> list | dict | None:
+        from lib.extractor_base import BaseExtractor
+        return BaseExtractor.get_norm_rules(self, harmonized_field)
+
+    def normalize_value(self, harmonized_field: str, raw_value):
+        from lib.extractor_base import BaseExtractor
+        return BaseExtractor.normalize_value(self, harmonized_field, raw_value)
+
+    def derive_BOR_binary(self, bor_value):
+        from lib.extractor_base import BaseExtractor
+        return BaseExtractor.derive_BOR_binary(self, bor_value)
+
+    def derive_bor_bin(self, bor_binary, pfs_time=None):
+        from lib.extractor_base import BaseExtractor
+        return BaseExtractor.derive_bor_bin(self, bor_binary, pfs_time)
+
+    def derive_pfs_bin(self, pfs_time, pfs_stat=None):
+        from lib.extractor_base import BaseExtractor
+        return BaseExtractor.derive_pfs_bin(self, pfs_time, pfs_stat)
 
     # ── source authority: the specification, not the config ─────────────────
     def src_path(self, key: str) -> Path:
         """Resolve a declared source id to a path under the project root.
 
-        Overrides ``BaseExtractor.src_path``, which reads
-        ``harmonization_config.yaml``. The specification is the only authority
-        here. Path containment is still enforced and there is still no basename
-        fallback.
+        The specification is the only source authority. Path containment is
+        enforced and there is no basename fallback.
         """
         src = self.spec.source(key)
         if src is None:

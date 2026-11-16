@@ -122,6 +122,14 @@ class SourceSession:
             )
         return self._cache[ck]
 
+    def _register_observed_ref(self, key: str, ref: SourceRef) -> None:
+        """Retain an already observed ref after caller-side runtime validation.
+
+        Registration performs no source resolution, reading, hashing or ref
+        reconstruction. External-anchor selection/evidence stays with the caller.
+        """
+        self._refs[key] = ref
+
     def ref(self, key: str) -> SourceRef:
         """SourceRef for a previously loaded logical input."""
         if key not in self._refs:
