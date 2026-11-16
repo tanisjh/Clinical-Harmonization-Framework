@@ -193,3 +193,115 @@ def test_all_cached_loaders_resolve_again_and_propagate_resolver_errors(tmp_path
     base.src_path = refuse
     with pytest.raises(LookupError, match="current resolver refuses source"):
         load()
+
+
+def test_cell_evaluation_order_including_late_failure(tmp_path):
+    events = []
+
+    class OrderedExtractor(SyntheticExtractor):
+        @property
+        def template_trial_name(self):
+            events.append("trial")
+            assert self._legacy_label_uses == 1
+            return "trial-verbatim"
+
+        @property
+        def run_id(self):
+            events.append("run")
+            return self._run
+
+        @run_id.setter
+        def run_id(self, value):
+            self._run = value
+
+        @property
+        def spec_ref(self):
+            events.append("spec")
+            return self._spec
+
+        @spec_ref.setter
+        def spec_ref(self, value):
+            self._spec = value
+
+        @staticmethod
+        def _anchor_str(value):
+            events.append("normalize:" + value)
+            return "normalized:" + value
+
+    class Row:
+        def __getitem__(self, key):
+            events.append("get:" + key)
+            return key
+
+    class Confidence:
+        def __float__(self):
+            events.append("confidence")
+            return 0.75
+
+    class RecordKey:
+        def __bool__(self):
+            events.append("record-key")
+            return False
+
+    base = OrderedExtractor(tmp_path, pd.DataFrame(), {}, {})
+    events.clear()
+    with pytest.raises(ValueError, match="raw value is not a supported scalar: object"):
+        base.cell(Row(), "field", 1, Confidence(), "legacy", "column", 0,
+                  "direct", source_record_key=RecordKey(), raw_value=object())
+    assert events == ["trial", "get:cimac_part_id", "normalize:cimac_part_id",
+                      "get:Cimac.id", "normalize:Cimac.id",
+                      "get:Collection_Event", "normalize:Collection_Event",
+                      "confidence", "record-key", "run", "spec"]
+    assert base._legacy_label_uses == 1
+
+
+def test_invalid_confidence_precedes_missing_run_context(tmp_path):
+    base = make_base(tmp_path)
+    del base.run_id
+    row = {"cimac_part_id": "SYNTH-001", "Cimac.id": "SAMPLE-001", "Collection_Event": "event-1"}
+    with pytest.raises(ValueError, match="could not convert string to float"):
+        base.cell(row, "field", 1, "invalid", "legacy", "column", 0, "direct")
+    assert base._legacy_label_uses == 1
+
+
+def test_legacy_counter_has_one_live_factory_owner(tmp_path):
+    from lib.cell_factory import CellFactory
+
+    base = make_base(tmp_path)
+    other = make_base(tmp_path)
+    assert base._cell_factory is not other._cell_factory
+    session = base._source_session
+    base._legacy_label_uses = 7
+    assert base._cell_factory.legacy_label_uses == 7
+    base._cell_factory.legacy_label_uses = 11
+    assert base._legacy_label_uses == 11
+    base._cell_factory = CellFactory()
+    assert base._legacy_label_uses == other._legacy_label_uses == 0
+    assert base._source_session is session
+
+
+def test_cell_context_is_live_and_source_session_unchanged(tmp_path):
+    base = make_base(tmp_path)
+    session = base._source_session
+    row = {"cimac_part_id": "SYNTH-001", "Cimac.id": "SAMPLE-001", "Collection_Event": "event-1"}
+    for trial, run, spec in [("trial-1", "run-1", "spec@1"), ("trial-2", "run-2", "spec@2")]:
+        base.template_trial_name, base.run_id, base.spec_ref = trial, run, spec
+        cell = base.cell(row, "field", False, 1, "legacy", "column", 0, "direct")
+        assert (cell.trial, cell.run_id, cell.spec_ref) == (trial, run, spec)
+    assert base._legacy_label_uses == 2
+    assert base._source_session is session and base.source_refs() == {}
+
+
+def test_normalizer_overrides_are_resolved_before_each_identity_lookup(tmp_path):
+    base = make_base(tmp_path)
+    base._anchor_str = lambda value: "initial:" + value
+
+    class Row:
+        def __getitem__(self, key):
+            base._anchor_str = lambda value: "next:" + value
+            return key
+
+    cell = base.cell(Row(), "field", 1, 1, "legacy", "column", 0, "direct")
+    assert cell.cimac_part_id == "initial:cimac_part_id"
+    assert cell.Cimac_id == "next:Cimac.id"
+    assert cell.Collection_Event == "next:Collection_Event"

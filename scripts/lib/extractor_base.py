@@ -17,6 +17,12 @@ from typing import Iterator
 
 import pandas as pd
 
+from .cell_factory import (
+    RAW_VALUE_ABSENT as _RAW_VALUE_ABSENT,
+    CellFactory,
+    anchor_str,
+    compatibility_identity,
+)
 from .normalize import (
     derive_bor_binary,
     derive_bor_bin,
@@ -24,12 +30,9 @@ from .normalize import (
     normalize,
 )
 from .provenance import Cell
-from .replay_contract import encode_typed_raw
 from .source_ref import SourceRef, assert_within_roots
 from .source_session import SourceSession
 from .xlsx_reader import TrustedXlsxObservation
-
-_RAW_VALUE_ABSENT = object()
 
 
 class BaseExtractor:
@@ -61,7 +64,7 @@ class BaseExtractor:
         self.spec_ref = spec_ref
         # Counts cell() calls that still pass a bare string instead of a
         # SourceRef. Must reach 0 as extractors are migrated (plan §7 A6).
-        self._legacy_label_uses: int = 0
+        self._cell_factory = CellFactory()
 
     # ── source-file access ───────────────────────────────────────────────────
     def src_path(self, key: str) -> Path:
@@ -188,11 +191,15 @@ class BaseExtractor:
         `cimac_part_id` becomes `""`, which the target schema rejects outright,
         whereas `"None"` would pass as a plausible seven-character-ish token.
         """
-        if value is None:
-            return ""
-        if isinstance(value, float) and value != value:      # NaN
-            return ""
-        return str(value)
+        return anchor_str(value)
+
+    @property
+    def _legacy_label_uses(self) -> int:
+        return self._cell_factory.legacy_label_uses
+
+    @_legacy_label_uses.setter
+    def _legacy_label_uses(self, value: int) -> None:
+        self._cell_factory.legacy_label_uses = value
 
     def cell(self, anchor_row, harmonized_field, value, confidence, source_file,
              source_column, source_row_idx, extraction_method, notes="", *,
@@ -211,58 +218,19 @@ class BaseExtractor:
             "CONFIG:trial_constants" / "DERIVED:BOR") — structured fields stay
             empty and the legacy-label counter is incremented.
         """
-        if isinstance(source_file, SourceRef):
-            ref = source_file
-            legacy_label = ref.logical_label
-            resolved_path = ref.resolved_path
-            source_sha256 = ref.sha256
-            source_sheet = ref.sheet or ""
-            source_ref_id = ref.source_ref_id
-        else:
-            ref = None
-            legacy_label = source_file
-            resolved_path = ""
-            source_sha256 = ""
-            source_sheet = ""
-            source_ref_id = ""
-            self._legacy_label_uses += 1
-
-        return Cell(
-            trial=self.template_trial_name,
-            cimac_part_id=self._anchor_str(anchor_row["cimac_part_id"]),
-            Cimac_id=self._anchor_str(anchor_row["Cimac.id"]),
-            Collection_Event=self._anchor_str(anchor_row["Collection_Event"]),
-            harmonized_field=harmonized_field,
-            value=value,
-            confidence=float(confidence),
-            source_file=legacy_label,
-            source_column=source_column,
-            source_row_idx=source_row_idx,
-            extraction_method=extraction_method,
-            notes=notes,
-            source_logical_label=legacy_label,
-            source_resolved_path=resolved_path,
-            source_sha256=source_sha256,
-            source_sheet=source_sheet,
-            source_row_number=("" if source_row_number is None else source_row_number),
-            source_record_key=(source_record_key or ""),
-            raw_value=("" if raw_value is _RAW_VALUE_ABSENT or raw_value is None
-                       else raw_value),
-            run_id=self.run_id,
-            spec_ref=self.spec_ref,
-            mapping_id=mapping_id,
-            source_ref_id=source_ref_id,
-            raw_value_json=("" if raw_value is _RAW_VALUE_ABSENT
-                            or not raw_evidence_recorded else
-                            encode_typed_raw(raw_value).to_json()),
-            evidence_refs=evidence_refs,
-            rule_id=rule_id,
-            rule_version=rule_version,
-            contributions=contributions,
-            authoritative_for=authoritative_for,
-            derivation=derivation,
-            value_state=value_state,
-        )
+        source = self._cell_factory._prepare_source(source_file)
+        identity = compatibility_identity(
+            self.template_trial_name, anchor_row, get_anchor_str=lambda: self._anchor_str)
+        return self._cell_factory._build_prepared(
+            identity, harmonized_field, value, confidence, source, source_column,
+            source_row_idx, extraction_method, notes,
+            run_id=lambda: self.run_id, spec_ref=lambda: self.spec_ref,
+            raw_value=raw_value, source_row_number=source_row_number,
+            source_record_key=source_record_key, rule_id=rule_id,
+            rule_version=rule_version, contributions=contributions,
+            authoritative_for=authoritative_for, derivation=derivation,
+            value_state=value_state, mapping_id=mapping_id,
+            evidence_refs=evidence_refs, raw_evidence_recorded=raw_evidence_recorded)
 
     # ── must override ────────────────────────────────────────────────────────
     def extract(self) -> Iterator[Cell]:
