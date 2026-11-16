@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 import yaml
 
+from lib import normalize, rule_registry
 from lib.anchor_evidence import RuntimeSourceRefs, load_external_anchor
 from lib.cell_factory import RAW_VALUE_ABSENT, CellFactory
 from lib.extractor_base import BaseExtractor
@@ -227,14 +228,64 @@ def test_reader_table_and_preflight_contract(case):
     assert "sequence_number" in source_columns(c.spec, "readings", c.root)
 
 
-def test_legacy_helper_compatibility_and_empty_context_state(case):
+def test_empty_compatibility_context_state_is_preserved(case):
     ex = case().executor
     assert ex.cfg == ex.value_norms == ex.derived_rules == {}
     assert ex.trial_dir == ex.project_root / ex.trial_dir_name
-    for name, args in [("get_norm_rules", ("synthetic",)), ("normalize_value", ("synthetic", " raw ")),
-                       ("derive_BOR_binary", (None,)), ("derive_bor_bin", (None,)),
-                       ("derive_pfs_bin", (None,))]:
-        assert getattr(ex, name)(*args) == getattr(BaseExtractor, name)(ex, *args)
+
+
+def test_normalization_owner_still_applies_rules():
+    rules = [{"match": "raw", "value": "mapped", "confidence": .9, "note": "synthetic exact"}]
+    assert normalize.normalize("synthetic", " raw ", rules) == ("mapped", .9, "synthetic exact")
+    assert normalize.normalize("synthetic", None, rules) == (None, 0.0, "input_is_NaN")
+
+
+@pytest.mark.parametrize("rule_id,function_name,values,params,expected_value", [
+    ("derived.bor_binary.v1", "derive_bor_binary", ["synthetic"], {"rules": {"R": ["synthetic"]}}, "R"),
+    ("derived.bor_binary.v1", "derive_bor_binary", [None], {"rules": {"R": ["synthetic"]}}, None),
+    ("derived.bor_bin_120d.v1", "derive_bor_bin", ["R", 0], {"landmark_days": 120}, 1),
+    ("derived.bor_bin_120d.v1", "derive_bor_bin", ["SD", 119], {"landmark_days": 120}, 0),
+    ("derived.bor_bin_120d.v1", "derive_bor_bin", ["SD", 120], {"landmark_days": 120}, 1),
+    ("derived.pfs_bin_120d.v1", "derive_pfs_bin", [119, 1], {"landmark_days": 120}, 0),
+    ("derived.pfs_bin_120d.v1", "derive_pfs_bin", [119, 0], {"landmark_days": 120}, None),
+    ("derived.pfs_bin_120d.v1", "derive_pfs_bin", [120, 0], {"landmark_days": 120}, 1),
+])
+def test_registered_scientific_rules_keep_canonical_owners(
+        rule_id, function_name, values, params, expected_value):
+    function = getattr(normalize, function_name)
+    rule = rule_registry.resolve(rule_id, "1", kind=rule_registry.KIND_FIELD)
+    assert rule.func is function
+    expected = function(*values, **params)
+    assert expected[0] == expected_value
+    assert rule_registry.invoke(rule, values, params) == expected
+
+
+def test_executor_uses_registered_scientific_owners(case):
+    c = case()
+    document = yaml.safe_load((c.root / "spec.yaml").read_text())
+    declarations = [
+        ("response_class", "derived.bor_binary.v1", ["reading_text"], {"rules": {"R": ["001"]}}),
+        ("response_flag", "derived.bor_bin_120d.v1", ["response_class", "sequence_number"], {"landmark_days": 120}),
+        ("landmark_flag", "derived.pfs_bin_120d.v1", ["sequence_number", "reading_text"], {"landmark_days": 120}),
+    ]
+    for target, rule_id, inputs, params in declarations:
+        document["mappings"].append({
+            "mapping_id": "custom." + target, "target": target, "op": "custom_rule",
+            "inputs": inputs, "params": params,
+            "output_type": "string" if target == "response_class" else "number",
+            "rule": {"id": rule_id, "version": "1", "review_status": "approved"},
+            "confidence": {"value": "from_rule", "no_value": .25},
+            "provenance": {"record_key_from": "participant"},
+        })
+    path = c.root / "derived.yaml"
+    path.write_text(yaml.safe_dump(document, sort_keys=False))
+    executor = SpecExecutor(load_spec(path, require_executable=True), c.root, c.anchor,
+                            run_id="scientific-owners")
+    cells = {cell.harmonized_field: cell for cell in executor.extract()}
+    assert [cells[name].value for name, *_ in declarations] == ["R", 1, 0]
+    for target, rule_id, *_ in declarations:
+        assert cells[target].rule_id == rule_id and cells[target].rule_version == "1"
+        assert cells[target].confidence == .95
 
 
 def test_architecture_and_unchanged_public_signatures():
@@ -255,9 +306,19 @@ def test_architecture_and_unchanged_public_signatures():
     cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "SpecExecutor")
     assert not any(isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "super"
                    for n in ast.walk(cls))
-    helpers = {"get_norm_rules", "normalize_value", "derive_BOR_binary", "derive_bor_bin", "derive_pfs_bin"}
-    for method in (n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name not in helpers):
-        assert not any(isinstance(n, ast.Name) and n.id == "BaseExtractor" for n in ast.walk(method))
+    retired = {"get_norm_rules", "normalize_value", "derive_BOR_binary", "derive_bor_bin", "derive_pfs_bin"}
+    assert not any(hasattr(SpecExecutor, name) for name in retired)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            assert node.id != "BaseExtractor"
+        elif isinstance(node, ast.Attribute):
+            assert node.attr != "BaseExtractor"
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            names = [alias.name for alias in node.names]
+            if isinstance(node, ast.ImportFrom):
+                names.append(node.module or "")
+            assert not any({"extractor_base", "BaseExtractor"} & set(name.split("."))
+                           for name in names)
 
 
 def test_fresh_modern_runtime_does_not_import_base_or_legacy_registry():

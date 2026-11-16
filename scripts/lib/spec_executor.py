@@ -442,28 +442,6 @@ class SpecExecutor:
             value_state=value_state, mapping_id=mapping_id,
             evidence_refs=evidence_refs, raw_evidence_recorded=raw_evidence_recorded)
 
-    # Legacy scientific conveniences are unused by the modern runtime. Keep
-    # lazy compatibility calls to the existing implementations until P1F review.
-    def get_norm_rules(self, harmonized_field: str) -> list | dict | None:
-        from lib.extractor_base import BaseExtractor
-        return BaseExtractor.get_norm_rules(self, harmonized_field)
-
-    def normalize_value(self, harmonized_field: str, raw_value):
-        from lib.extractor_base import BaseExtractor
-        return BaseExtractor.normalize_value(self, harmonized_field, raw_value)
-
-    def derive_BOR_binary(self, bor_value):
-        from lib.extractor_base import BaseExtractor
-        return BaseExtractor.derive_BOR_binary(self, bor_value)
-
-    def derive_bor_bin(self, bor_binary, pfs_time=None):
-        from lib.extractor_base import BaseExtractor
-        return BaseExtractor.derive_bor_bin(self, bor_binary, pfs_time)
-
-    def derive_pfs_bin(self, pfs_time, pfs_stat=None):
-        from lib.extractor_base import BaseExtractor
-        return BaseExtractor.derive_pfs_bin(self, pfs_time, pfs_stat)
-
     # ── source authority: the specification, not the config ─────────────────
     def src_path(self, key: str) -> Path:
         """Resolve a declared source id to a path under the project root.
