@@ -266,14 +266,11 @@ def _record_key_columns(trial: CanonicalTrial, contract) -> list[str]:
     """The columns that identify one harmonized record.
 
     Taken first from the target schema's explicit row key, so the key is a
-    property of the contract rather than a list written here.  The older role
-    and CIMAC-name fallbacks remain for contracts created by legacy callers.
+    property of the contract rather than a list written here. The CIMAC-name
+    fallback remains for contracts created without an explicit row key.
     """
     if contract.row_key:
         return list(contract.row_key)
-    declared = [f.name for f in getattr(contract, "identifier_fields", [])]
-    if declared:
-        return declared
     return [c for c in ("trial", "cimac_part_id", "Cimac.id", "Collection_Event")
             if c in trial.frame.columns]
 
